@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose provides its own theming; the Activity-level theme is a
+         simple Material 3 parent with no decor, so the Compose theme can
+         take over without any AppCompat dependency. -->
+    <style name="Theme.SudokuTrainer" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

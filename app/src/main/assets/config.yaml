@@ -1,0 +1,18 @@
+# Sudoku Trainer Configuration
+#
+# solve_criteria: Number of remaining unsolved cells at which the puzzle
+#                 will auto-solve. All filled cells must contain the
+#                 correct value for auto-solve to trigger.
+solve_criteria: 10
+
+# solve_speed: Milliseconds between each cell being auto-filled during
+#              the solve animation. Lower = faster.
+solve_speed: 500
+
+# firework_speed: Multiplier for particle velocity. Higher = faster
+#                 moving particles. Default baseline is 1.0.
+firework_speed: 4.0
+
+# firework_duration: Total celebration duration in milliseconds.
+#                    Firework bursts are spread evenly across this window.
+firework_duration: 120000
