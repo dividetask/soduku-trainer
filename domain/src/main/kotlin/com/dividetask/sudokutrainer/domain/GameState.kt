@@ -8,8 +8,12 @@ data class GameState(
     val activeColor: GuessColor = GuessColor.DEFAULT,
     val history: List<Move> = emptyList(),
     val phase: Phase = Phase.Playing,
+    val hintCount: Int = 0,
+    val hintUi: HintUi? = null,
+    val pendingHint: PendingHint? = null,
+    val lastHint: HintEngine.Hint? = null,
 ) {
-    enum class Phase { Playing, AutoSolving, Celebrating }
+    enum class Phase { Playing, AutoSolving, Celebrating, Hinting }
 
     init {
         require(cells.size == 81)
@@ -30,7 +34,8 @@ data class GameState(
 
     /**
      * Check if the puzzle is ready for auto-solve: at most [solveCriteria]
-     * empty cells remain AND every filled cell is correct.
+     * empty cells remain AND every filled cell is correct. Cell color
+     * doesn't matter — any placed value (Guess, Solve, etc.) counts.
      */
     fun isMostlySolved(solveCriteria: Int): Boolean =
         !hasIncorrectEntry && emptyCellCount <= solveCriteria

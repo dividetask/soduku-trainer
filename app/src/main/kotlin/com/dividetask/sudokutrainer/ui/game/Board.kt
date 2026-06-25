@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.dividetask.sudokutrainer.domain.Cell
 import com.dividetask.sudokutrainer.domain.CellColor
 import com.dividetask.sudokutrainer.domain.GameState
+import com.dividetask.sudokutrainer.domain.HintUi
 import com.dividetask.sudokutrainer.ui.theme.toColor
 
 /**
@@ -41,10 +42,18 @@ fun Board(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    val gridBg = Color.White
+    val hint = state.hintUi
+    val gridBg = when (hint) {
+        HintUi.NoHintFlash -> Color(0xFFFFCDD2) // red flash
+        else -> Color.White
+    }
     val gridLine = Color(0xFFB0BEC5)
     val gridLineThick = Color(0xFF263238)
     val highlight = Color(0xFFFFF59D) // pale yellow
+    val targetBg = Color(0xFFA5D6A7) // hint target: green
+    val eliminatorBg = Color(0xFFFFAB91) // hint eliminator peer: light red
+    val unitBg = Color(0xFFE3F2FD) // hint unit frame: very pale blue
+    val currentBg = Color(0xFFFFE082) // hint sweep cursor: amber
     val pencilColor = Color(0xFF607D8B)
 
     Box(
@@ -114,6 +123,153 @@ fun Board(
                                 )
                             }
                         }
+                    }
+
+                    // Progressive-hint key-cell highlight (stage 2 only,
+                    // and only when no active animation overlay is
+                    // competing for the same cells).
+                    val pending = state.pendingHint
+                    if (hint == null && pending != null && pending.showCells) {
+                        for (idx in pending.keyCells) {
+                            val r = idx / 9; val c = idx % 9
+                            drawRect(
+                                color = targetBg,
+                                topLeft = Offset(c * cellW, r * cellH),
+                                size = Size(cellW, cellH),
+                            )
+                        }
+                    }
+
+                    // Hint overlays: green target + red eliminator peers.
+                    if (hint is HintUi.NakedSingle) {
+                        for (idx in hint.eliminatorCells) {
+                            val r = idx / 9; val c = idx % 9
+                            drawRect(
+                                color = eliminatorBg,
+                                topLeft = Offset(c * cellW, r * cellH),
+                                size = Size(cellW, cellH),
+                            )
+                        }
+                        val tr = hint.targetCell / 9
+                        val tc = hint.targetCell % 9
+                        drawRect(
+                            color = targetBg,
+                            topLeft = Offset(tc * cellW, tr * cellH),
+                            size = Size(cellW, cellH),
+                        )
+                    }
+
+                    // Generic elimination-hint overlay (pairs, triples,
+                    // pointing pair, X-Wing, etc.). Order: unit frame
+                    // (faint), explainer peers (red), current cell
+                    // (amber), key cells (green) — green stays on top.
+                    if (hint is HintUi.Elimination) {
+                        for (idx in hint.unitCells) {
+                            if (idx in hint.keyCells) continue
+                            val r = idx / 9; val c = idx % 9
+                            drawRect(
+                                color = unitBg,
+                                topLeft = Offset(c * cellW, r * cellH),
+                                size = Size(cellW, cellH),
+                            )
+                        }
+                        for (idx in hint.explainerCells) {
+                            if (idx in hint.keyCells) continue
+                            val r = idx / 9; val c = idx % 9
+                            drawRect(
+                                color = eliminatorBg,
+                                topLeft = Offset(c * cellW, r * cellH),
+                                size = Size(cellW, cellH),
+                            )
+                        }
+                        val cur = hint.currentCell
+                        if (cur != null && cur !in hint.keyCells) {
+                            val r = cur / 9; val c = cur % 9
+                            drawRect(
+                                color = currentBg,
+                                topLeft = Offset(c * cellW, r * cellH),
+                                size = Size(cellW, cellH),
+                            )
+                        }
+                        for (idx in hint.keyCells) {
+                            val r = idx / 9; val c = idx % 9
+                            drawRect(
+                                color = targetBg,
+                                topLeft = Offset(c * cellW, r * cellH),
+                                size = Size(cellW, cellH),
+                            )
+                        }
+                    }
+
+                    // Note-single overlay: just the green target cell.
+                    if (hint is HintUi.NoteSingle) {
+                        val r = hint.targetCell / 9
+                        val c = hint.targetCell % 9
+                        drawRect(
+                            color = targetBg,
+                            topLeft = Offset(c * cellW, r * cellH),
+                            size = Size(cellW, cellH),
+                        )
+                    }
+
+                    // Candidate-sweep overlay: amber cursor + red
+                    // eliminator peers for the cell being pruned.
+                    if (hint is HintUi.CandidateSweep) {
+                        for (idx in hint.eliminatorCells) {
+                            val r = idx / 9; val c = idx % 9
+                            drawRect(
+                                color = eliminatorBg,
+                                topLeft = Offset(c * cellW, r * cellH),
+                                size = Size(cellW, cellH),
+                            )
+                        }
+                        val cur = hint.currentCell
+                        if (cur != null) {
+                            val r = cur / 9; val c = cur % 9
+                            drawRect(
+                                color = currentBg,
+                                topLeft = Offset(c * cellW, r * cellH),
+                                size = Size(cellW, cellH),
+                            )
+                        }
+                    }
+
+                    // Hidden-single overlay: unit frame, current cell,
+                    // outside-unit eliminator peers, and target. Drawn in
+                    // order so the target stays on top.
+                    if (hint is HintUi.HiddenSingle) {
+                        for (idx in hint.unitCells) {
+                            val r = idx / 9; val c = idx % 9
+                            drawRect(
+                                color = unitBg,
+                                topLeft = Offset(c * cellW, r * cellH),
+                                size = Size(cellW, cellH),
+                            )
+                        }
+                        for (idx in hint.eliminatorCells) {
+                            val r = idx / 9; val c = idx % 9
+                            drawRect(
+                                color = eliminatorBg,
+                                topLeft = Offset(c * cellW, r * cellH),
+                                size = Size(cellW, cellH),
+                            )
+                        }
+                        val cur = hint.currentCell
+                        if (cur != null) {
+                            val r = cur / 9; val c = cur % 9
+                            drawRect(
+                                color = currentBg,
+                                topLeft = Offset(c * cellW, r * cellH),
+                                size = Size(cellW, cellH),
+                            )
+                        }
+                        val tr = hint.targetCell / 9
+                        val tc = hint.targetCell % 9
+                        drawRect(
+                            color = targetBg,
+                            topLeft = Offset(tc * cellW, tr * cellH),
+                            size = Size(cellW, cellH),
+                        )
                     }
 
                     // Grid lines: thin for every cell, thick for the 3x3 boxes.

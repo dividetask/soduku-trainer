@@ -10,6 +10,10 @@ import com.dividetask.sudokutrainer.domain.Difficulty
 import com.dividetask.sudokutrainer.domain.GameReducer
 import com.dividetask.sudokutrainer.domain.GameState
 import com.dividetask.sudokutrainer.domain.GuessColor
+import com.dividetask.sudokutrainer.domain.HintEngine
+import com.dividetask.sudokutrainer.domain.HintUi
+import com.dividetask.sudokutrainer.domain.Move
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +33,29 @@ class GameViewModel(
 
     private val _exitSignal = MutableStateFlow(false)
     val exitSignal: StateFlow<Boolean> = _exitSignal.asStateFlow()
+
+    private val animator = HintAnimator(
+        scope = viewModelScope,
+        stepDelayMs = { config.hintStepMs },
+        sweepCellMs = { config.sweepCellMs },
+        getState = { _state.value },
+        setState = { _state.value = it },
+    )
+
+    init {
+        // Auto-trigger solve when the board has few enough empty cells
+        // — fires once, regardless of correctness of placed values.
+        viewModelScope.launch {
+            _state.collect { s ->
+                if (!autoSolveStarted &&
+                    s.phase == GameState.Phase.Playing &&
+                    s.isMostlySolved(config.solveCriteria)
+                ) {
+                    onSolve()
+                }
+            }
+        }
+    }
 
     /** Whether the puzzle qualifies for auto-solve (driven by config.yaml). */
     val isReadyToSolve: Boolean
@@ -68,7 +95,11 @@ class GameViewModel(
 
     val gameConfig: GameConfig get() = config
 
+    @Volatile private var autoSolveStarted: Boolean = false
+
     fun onSolve() {
+        if (autoSolveStarted) return
+        autoSolveStarted = true
         _state.value = GameReducer.beginAutoSolve(_state.value)
         viewModelScope.launch {
             while (_state.value.emptyCellCount > 0) {
@@ -81,8 +112,120 @@ class GameViewModel(
         }
     }
 
+    fun onShowAgain() {
+        val s = _state.value
+        if (s.phase != GameState.Phase.Playing) return
+        if (animator.isRunning) return
+        val hint = s.lastHint ?: return
+        // If the last history entry is still the hint's own move, undo
+        // it so the animation has something to apply. (If the player
+        // already pressed Undo manually, the hint isn't on the board
+        // anymore — just re-apply.)
+        val needsUndo = hintMatchesTopOfHistory(s, hint)
+        val base = if (needsUndo) GameReducer.undo(s) else s
+        _state.value = base.copy(lastHint = hint)
+        animator.launch(
+            hint = hint,
+            countAsHint = false,
+            speedMultiplier = config.showAgainMultiplier,
+        )
+    }
+
+    private fun hintMatchesTopOfHistory(state: GameState, hint: HintEngine.Hint): Boolean {
+        val last = state.history.lastOrNull() ?: return false
+        return when (hint) {
+            is HintEngine.NakedSingle, is HintEngine.HiddenSingle -> last is Move.SetValue
+            else -> last is Move.PencilSweep
+        }
+    }
+
+    fun onSweep() {
+        val s = _state.value
+        if (s.phase != GameState.Phase.Playing) return
+        if (s.hintUi != null) return
+        if (animator.isRunning) return
+        if (s.hasIncorrectEntry) return
+
+        val grid = IntArray(81) { i -> s.cells[i].value ?: 0 }
+        val marks = Array(81) { i -> s.cells[i].pencilMarks.keys.toSet() }
+        val sweep = HintEngine.findCandidateSweep(grid, marks) ?: return
+        animator.launch(sweep, countAsHint = false)
+    }
+
+    private var pendingHintJob: Job? = null
+
     fun onHint() {
-        // No-op in v1.
+        val s = _state.value
+        // Pressing Hint while an animation is in flight skips to the
+        // final placement.
+        if (animator.isRunning) {
+            animator.skip()
+            return
+        }
+        if (s.phase != GameState.Phase.Playing) return
+        if (s.hintUi != null) return
+
+        // Stage 2 or 3: a pending hint already exists from a prior press.
+        val ph = s.pendingHint
+        if (ph != null) {
+            if (!ph.showCells) {
+                _state.value = GameReducer.advancePendingHintRevealCells(s)
+                startPendingHintTimer()
+            } else {
+                // Stage 3: clear the pending hint and run the animation.
+                pendingHintJob?.cancel()
+                _state.value = GameReducer.clearPendingHint(s)
+                animator.launch(ph.hint)
+            }
+            return
+        }
+
+        // Stage 1: find a new hint.
+        // If the board has any incorrect entries, the engine would reason
+        // from inconsistent state; flash red instead.
+        val grid = IntArray(81) { i -> s.cells[i].value ?: 0 }
+        val marks = Array(81) { i -> s.cells[i].pencilMarks.keys.toSet() }
+        val hint = if (s.hasIncorrectEntry) null else HintEngine.find(grid, marks)
+
+        when (hint) {
+            null -> {
+                _state.value = s.copy(hintUi = HintUi.NoHintFlash)
+                viewModelScope.launch {
+                    delay(config.hintFlashMs)
+                    _state.value = _state.value.copy(hintUi = null)
+                }
+            }
+            is HintEngine.NakedSingle -> {
+                _state.value = GameReducer.setPendingHint(s, hint, setOf(hint.targetCell))
+                startPendingHintTimer()
+            }
+            is HintEngine.HiddenSingle -> {
+                _state.value = GameReducer.setPendingHint(s, hint, setOf(hint.targetCell))
+                startPendingHintTimer()
+            }
+            is HintEngine.NoteSingle -> {
+                _state.value = GameReducer.setPendingHint(s, hint, setOf(hint.targetCell))
+                startPendingHintTimer()
+            }
+            is HintEngine.CandidateSweep -> {
+                // No single target cell, so no progressive flow — animate now.
+                animator.launch(hint)
+            }
+            is HintEngine.EliminationHint -> {
+                _state.value = GameReducer.setPendingHint(s, hint, hint.keyCells)
+                startPendingHintTimer()
+            }
+        }
+    }
+
+    private fun startPendingHintTimer() {
+        pendingHintJob?.cancel()
+        pendingHintJob = viewModelScope.launch {
+            delay(config.pendingHintMs)
+            if (_state.value.pendingHint != null) {
+                _state.value = GameReducer.clearPendingHint(_state.value)
+            }
+        }
     }
 
     companion object {
