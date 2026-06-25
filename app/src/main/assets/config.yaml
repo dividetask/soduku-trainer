@@ -13,6 +13,37 @@ solve_speed: 500
 #                 moving particles. Default baseline is 1.0.
 firework_speed: 4.0
 
-# firework_duration: Total celebration duration in milliseconds.
-#                    Firework bursts are spread evenly across this window.
-firework_duration: 120000
+# firework_duration: Total celebration duration in milliseconds before
+#                    returning to the new game screen. Firework bursts
+#                    are spread evenly across this window.
+firework_duration: 5000
+
+# hint_step_ms: Milliseconds between each digit step (1..9) of the hint
+#               animation sweep. Lower = faster.
+hint_step_ms: 1000
+
+# hint_flash_ms: Duration of the red board flash shown when the hint
+#                engine can't find an applicable technique.
+hint_flash_ms: 600
+
+# sweep_cell_ms: Milliseconds between cells during the Candidate Sweep
+#                animation. Sweeps cover many cells per hint so this
+#                ticks faster than hint_step_ms.
+sweep_cell_ms: 150
+
+# pending_hint_ms: How long a pending hint (technique name and any
+#                  revealed cell highlights) stays on screen before
+#                  fading. Also reset by each subsequent press that
+#                  advances the stage. Any board-changing player action
+#                  clears it immediately regardless of the timer.
+pending_hint_ms: 10000
+
+# show_again_multiplier: How much slower the Show Again button replays
+#                        the last hint compared to the normal animation
+#                        pace. 3.0 = three times as slow.
+show_again_multiplier: 3.0
+
+# show_test_button: When true, the main menu shows a "Test" button below
+#                   Extreme that walks through each hint technique's
+#                   teaching animation on a pre-built example puzzle.
+show_test_button: true

@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -177,48 +178,96 @@ fun ActionRow(
     isSolveReady: Boolean,
     onUndo: () -> Unit,
     onClear: () -> Unit,
+    onSweep: () -> Unit,
+    onHint: () -> Unit,
+    onShowAgain: () -> Unit,
     onGiveUpOrSolve: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val canUndo = state.history.isNotEmpty() && state.phase == GameState.Phase.Playing
     val busy = state.phase != GameState.Phase.Playing
+    val playing = state.phase == GameState.Phase.Playing
+    // The hint button stays enabled while a hint is animating so pressing
+    // it again skips the animation to the final placement.
+    val canHint = playing || state.phase == GameState.Phase.Hinting
+    val canShowAgain = playing && state.lastHint != null
 
-    Row(
+    Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Button(
-            onClick = onUndo,
-            enabled = canUndo,
-            modifier = Modifier.weight(1f),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text("Undo")
+            Button(
+                onClick = onUndo,
+                enabled = canUndo,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text("Undo")
+            }
+            Button(
+                onClick = onSweep,
+                enabled = playing,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF1565C0),
+                ),
+            ) {
+                Text("Sweep")
+            }
+            Button(
+                onClick = onHint,
+                enabled = canHint,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF2E7D32),
+                ),
+            ) {
+                Text(if (state.phase == GameState.Phase.Hinting) "Skip" else "Hint")
+            }
         }
-        Button(
-            onClick = onClear,
-            enabled = state.phase == GameState.Phase.Playing,
-            modifier = Modifier.weight(1f),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.error,
-            ),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text("Clear")
-        }
-        Button(
-            onClick = onGiveUpOrSolve,
-            enabled = !busy,
-            modifier = Modifier.weight(1.3f),
-            colors = if (isSolveReady) {
-                ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                )
-            } else {
-                ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondary,
-                )
-            },
-        ) {
-            Text(if (isSolveReady) "Solve" else "Give Up")
+            Button(
+                onClick = onShowAgain,
+                enabled = canShowAgain,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF6A1B9A),
+                ),
+            ) {
+                Text("Show Again")
+            }
+            Button(
+                onClick = onClear,
+                enabled = playing,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                ),
+            ) {
+                Text("Clear")
+            }
+            Button(
+                onClick = onGiveUpOrSolve,
+                enabled = !busy,
+                modifier = Modifier.weight(1f),
+                colors = if (isSolveReady) {
+                    ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                    )
+                } else {
+                    ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary,
+                    )
+                },
+            ) {
+                Text(if (isSolveReady) "Solve" else "Give Up")
+            }
         }
     }
 }

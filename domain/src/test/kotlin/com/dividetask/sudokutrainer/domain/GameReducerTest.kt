@@ -2,6 +2,7 @@ package com.dividetask.sudokutrainer.domain
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -231,10 +232,7 @@ class GameReducerTest {
         assertTrue(s.isMostlySolved(10))
         // Introduce one incorrect entry: pick a non-given cell, clear it,
         // and place a wrong value.
-        var wrongTarget = -1
-        for (i in 0 until 81) {
-            if (givens[i] == 0) { wrongTarget = i; break }
-        }
+        val wrongTarget = (0 until 81).first { givens[it] == 0 }
         val wr = wrongTarget / 9
         val wc = wrongTarget % 9
         s = GameReducer.doubleTapCell(s, wr, wc)
@@ -351,6 +349,450 @@ class GameReducerTest {
         s = GameReducer.tapCell(s, 0, 2) // place Red 4 at (0,2)
         // Blue 4 mark at (0,5) should still be there.
         assertEquals(GuessColor.Blue, s.cellAt(0, 5).pencilMarks[4])
+    }
+
+    @Test
+    fun `naked single hint flows from begin to complete`() {
+        val s0 = initial()
+        val grid = IntArray(81) { i -> s0.cells[i].value ?: 0 }
+        val hint = HintEngine.find(grid) as HintEngine.NakedSingle
+        val tRow = hint.targetCell / 9
+        val tCol = hint.targetCell % 9
+        // The found cell must match the puzzle's solution at that index.
+        assertEquals(puzzle.solutionAt(tRow, tCol), hint.solutionDigit)
+
+        var s = GameReducer.beginNakedSingleHint(s0, hint)
+        assertEquals(GameState.Phase.Hinting, s.phase)
+        val notes = s.cellAt(tRow, tCol).pencilMarks
+        assertEquals((1..9).toSet(), notes.keys)
+        assertTrue(s.hintUi is HintUi.NakedSingle)
+
+        // Sweep: eliminate every non-solution digit.
+        for (d in 1..9) {
+            s = GameReducer.advanceNakedSingleStep(
+                state = s,
+                activeDigit = d,
+                eliminatorCells = hint.eliminators[d].orEmpty(),
+                eliminate = d != hint.solutionDigit,
+            )
+        }
+        // Only the solution digit remains as a pencil mark.
+        assertEquals(setOf(hint.solutionDigit), s.cellAt(tRow, tCol).pencilMarks.keys)
+
+        s = GameReducer.completeNakedSingleHint(s, hint)
+        assertEquals(GameState.Phase.Playing, s.phase)
+        assertNull(s.hintUi)
+        assertEquals(hint.solutionDigit, s.cellAt(tRow, tCol).value)
+        assertEquals(CellColor.Guess(GuessColor.Blue), s.cellAt(tRow, tCol).valueColor)
+        assertTrue(s.cellAt(tRow, tCol).pencilMarks.isEmpty())
+        assertEquals(1, s.hintCount)
+    }
+
+    @Test
+    fun `hidden single hint flows from begin to complete`() {
+        // Construct a grid with a clean hidden single: (0,0) is the only
+        // cell in box 0 that can hold 5, because 5 appears on cols 1 & 2
+        // and rows 1 & 2 outside the box.
+        val grid = IntArray(81)
+        grid[3 * 9 + 1] = 5
+        grid[4 * 9 + 2] = 5
+        grid[1 * 9 + 5] = 5
+        grid[2 * 9 + 7] = 5
+        val hint = HintEngine.find(grid) as HintEngine.HiddenSingle
+        assertEquals(0, hint.targetCell)
+        assertEquals(5, hint.solutionDigit)
+
+        // Build a state with this grid as the givens (we only care about
+        // value placement, not difficulty/solution alignment).
+        val fakeSolution = IntArray(81) { i -> if (grid[i] != 0) grid[i] else 1 }
+        fakeSolution[0] = 5
+        val fakePuzzle = Puzzle(
+            id = "hs-test",
+            difficulty = Difficulty.Easy,
+            givens = grid.toList(),
+            solution = fakeSolution.toList(),
+        )
+        var s = GameState.forNewGame(fakePuzzle)
+
+        s = GameReducer.beginHiddenSingleHint(s, hint)
+        assertEquals(GameState.Phase.Hinting, s.phase)
+        assertTrue(s.hintUi is HintUi.HiddenSingle)
+        // Every empty cell in the unit now carries the solution digit as a mark.
+        for (idx in hint.unit.cells) {
+            val cell = s.cells[idx]
+            if (cell.value != null) continue
+            assertEquals(GuessColor.DEFAULT, cell.pencilMarks[5])
+        }
+
+        // Sweep each non-target empty cell.
+        for (idx in hint.unit.cells) {
+            if (idx == hint.targetCell) continue
+            if (s.cells[idx].value != null) continue
+            s = GameReducer.advanceHiddenSingleStep(
+                state = s,
+                currentCell = idx,
+                eliminatorCells = hint.eliminators[idx].orEmpty(),
+            )
+            assertNull(s.cells[idx].pencilMarks[5])
+        }
+        // Settle frame: target still has the mark; everyone else doesn't.
+        s = GameReducer.advanceHiddenSingleStep(s, currentCell = null, eliminatorCells = emptySet())
+        assertEquals(GuessColor.DEFAULT, s.cells[hint.targetCell].pencilMarks[5])
+
+        s = GameReducer.completeHiddenSingleHint(s, hint)
+        assertEquals(GameState.Phase.Playing, s.phase)
+        assertNull(s.hintUi)
+        assertEquals(5, s.cells[hint.targetCell].value)
+        assertEquals(CellColor.Guess(GuessColor.Blue), s.cells[hint.targetCell].valueColor)
+        assertEquals(1, s.hintCount)
+    }
+
+    @Test
+    fun `undo reverses a naked single hint and restores prior pencil marks`() {
+        var s = initial()
+        // Seed pencil marks in the cell where the puzzle has a naked single.
+        val grid = IntArray(81) { i -> s.cells[i].value ?: 0 }
+        val hint = HintEngine.find(grid) as HintEngine.NakedSingle
+        val tRow = hint.targetCell / 9
+        val tCol = hint.targetCell % 9
+        s = GameReducer.togglePencil(s)
+        s = GameReducer.selectColor(s, GuessColor.Red)
+        s = GameReducer.selectDigit(s, 2)
+        s = GameReducer.tapCell(s, tRow, tCol)
+        s = GameReducer.selectDigit(s, 7)
+        s = GameReducer.tapCell(s, tRow, tCol)
+        s = GameReducer.togglePencil(s)
+        val historySizeBeforeHint = s.history.size
+        assertEquals(setOf(2, 7), s.cellAt(tRow, tCol).pencilMarks.keys)
+
+        // Run the hint to completion.
+        s = GameReducer.beginNakedSingleHint(s, hint)
+        for (d in 1..9) {
+            s = GameReducer.advanceNakedSingleStep(
+                state = s,
+                activeDigit = d,
+                eliminatorCells = hint.eliminators[d].orEmpty(),
+                eliminate = d != hint.solutionDigit,
+            )
+        }
+        s = GameReducer.completeNakedSingleHint(s, hint)
+        assertEquals(hint.solutionDigit, s.cellAt(tRow, tCol).value)
+        assertEquals(historySizeBeforeHint + 1, s.history.size)
+        assertTrue(s.history.last() is Move.SetValue)
+
+        // Undo: value gone, prior pencil marks restored.
+        s = GameReducer.undo(s)
+        assertNull(s.cellAt(tRow, tCol).value)
+        assertEquals(GuessColor.Red, s.cellAt(tRow, tCol).pencilMarks[2])
+        assertEquals(GuessColor.Red, s.cellAt(tRow, tCol).pencilMarks[7])
+        assertEquals(historySizeBeforeHint, s.history.size)
+    }
+
+    @Test
+    fun `undo reverses a hidden single hint and restores sweep-erased peer marks`() {
+        // Same hidden-single setup as the begin-to-complete test.
+        val grid = IntArray(81)
+        grid[3 * 9 + 1] = 5
+        grid[4 * 9 + 2] = 5
+        grid[1 * 9 + 5] = 5
+        grid[2 * 9 + 7] = 5
+        val hint = HintEngine.find(grid) as HintEngine.HiddenSingle
+        val fakeSolution = IntArray(81) { i -> if (grid[i] != 0) grid[i] else 1 }
+        fakeSolution[0] = 5
+        val fakePuzzle = Puzzle(
+            id = "hs-undo-test",
+            difficulty = Difficulty.Easy,
+            givens = grid.toList(),
+            solution = fakeSolution.toList(),
+        )
+        var s = GameState.forNewGame(fakePuzzle)
+
+        // Player has placed a Purple 5 pencil mark in (0,1) — a non-target
+        // cell in box 0 that the sweep will erase.
+        s = GameReducer.togglePencil(s)
+        s = GameReducer.selectColor(s, GuessColor.Purple)
+        s = GameReducer.selectDigit(s, 5)
+        s = GameReducer.tapCell(s, 0, 1)
+        s = GameReducer.togglePencil(s)
+        assertEquals(GuessColor.Purple, s.cellAt(0, 1).pencilMarks[5])
+        val historySizeBeforeHint = s.history.size
+
+        // Run the hidden single hint to completion.
+        s = GameReducer.beginHiddenSingleHint(s, hint)
+        for (idx in hint.unit.cells) {
+            if (idx == hint.targetCell) continue
+            if (s.cells[idx].value != null) continue
+            s = GameReducer.advanceHiddenSingleStep(
+                state = s,
+                currentCell = idx,
+                eliminatorCells = hint.eliminators[idx].orEmpty(),
+            )
+        }
+        s = GameReducer.advanceHiddenSingleStep(s, currentCell = null, eliminatorCells = emptySet())
+        s = GameReducer.completeHiddenSingleHint(s, hint)
+        assertEquals(5, s.cellAt(0, 0).value)
+        assertNull(s.cellAt(0, 1).pencilMarks[5])
+        assertEquals(historySizeBeforeHint + 1, s.history.size)
+
+        // Undo: value gone, player's Purple 5 mark restored on (0,1).
+        s = GameReducer.undo(s)
+        assertNull(s.cellAt(0, 0).value)
+        assertEquals(GuessColor.Purple, s.cellAt(0, 1).pencilMarks[5])
+        assertEquals(historySizeBeforeHint, s.history.size)
+    }
+
+    @Test
+    fun `Candidate Sweep with initial fill seeds notes, prunes, and undoes atomically`() {
+        // Three givens scattered in box 0; no naked or hidden singles.
+        // The hardcoded solution avoids SudokuSolver.solveOne, which is
+        // exponential on such a sparse grid.
+        val solution = intArrayOf(
+            5, 3, 4, 6, 7, 8, 9, 1, 2,
+            6, 7, 2, 1, 9, 5, 3, 4, 8,
+            1, 9, 8, 3, 4, 2, 5, 6, 7,
+            8, 5, 9, 7, 6, 1, 4, 2, 3,
+            4, 2, 6, 8, 5, 3, 7, 9, 1,
+            7, 1, 3, 9, 2, 4, 8, 5, 6,
+            9, 6, 1, 5, 3, 7, 2, 8, 4,
+            2, 8, 7, 4, 1, 9, 6, 3, 5,
+            3, 4, 5, 2, 8, 6, 1, 7, 9,
+        )
+        val grid = IntArray(81)
+        grid[0] = solution[0]                 // 5 at (0,0)
+        grid[1 * 9 + 1] = solution[1 * 9 + 1] // 7 at (1,1)
+        grid[2 * 9 + 2] = solution[2 * 9 + 2] // 8 at (2,2)
+        val fake = Puzzle(
+            id = "cs-flow",
+            difficulty = Difficulty.Beginner,
+            givens = grid.toList(),
+            solution = solution.toList(),
+        )
+        var s = GameState.forNewGame(fake)
+        val hint = HintEngine.find(grid) as HintEngine.CandidateSweep
+        assertTrue(hint.initialFill)
+
+        s = GameReducer.beginCandidateSweep(s, hint)
+        assertEquals(GameState.Phase.Hinting, s.phase)
+
+        s = GameReducer.applyCandidateSweepFill(s)
+        // Every empty cell now carries 1..9 in the default color.
+        for (i in 0 until 81) {
+            val c = s.cells[i]
+            if (c.value != null) continue
+            assertEquals((1..9).toSet(), c.pencilMarks.keys, "cell $i should have all candidates")
+        }
+
+        for (plan in hint.plan) {
+            s = GameReducer.advanceCandidateSweepCell(
+                state = s,
+                currentCell = plan.cellIdx,
+                doomedDigits = plan.doomedDigits,
+                eliminatorPeers = plan.eliminatorPeers,
+            )
+        }
+        // (0,1) lost 5, 7, 8.
+        val cell01 = s.cellAt(0, 1)
+        assertTrue(5 !in cell01.pencilMarks.keys)
+        assertTrue(7 !in cell01.pencilMarks.keys)
+        assertTrue(8 !in cell01.pencilMarks.keys)
+
+        s = GameReducer.completeCandidateSweep(s, hint)
+        assertEquals(GameState.Phase.Playing, s.phase)
+        assertEquals(1, s.hintCount)
+        assertTrue(s.history.last() is Move.PencilSweep)
+
+        // Undo: every empty cell loses its candidates again (we started
+        // with none) and no peer cell carries leftover notes.
+        s = GameReducer.undo(s)
+        for (i in 0 until 81) {
+            assertTrue(s.cells[i].pencilMarks.isEmpty(), "cell $i should have no notes after undo")
+        }
+    }
+
+    @Test
+    fun `Candidate Sweep with countAsHint=false leaves hintCount unchanged`() {
+        // Same grid as the begin-to-complete sweep test.
+        val solution = intArrayOf(
+            5, 3, 4, 6, 7, 8, 9, 1, 2,
+            6, 7, 2, 1, 9, 5, 3, 4, 8,
+            1, 9, 8, 3, 4, 2, 5, 6, 7,
+            8, 5, 9, 7, 6, 1, 4, 2, 3,
+            4, 2, 6, 8, 5, 3, 7, 9, 1,
+            7, 1, 3, 9, 2, 4, 8, 5, 6,
+            9, 6, 1, 5, 3, 7, 2, 8, 4,
+            2, 8, 7, 4, 1, 9, 6, 3, 5,
+            3, 4, 5, 2, 8, 6, 1, 7, 9,
+        )
+        val grid = IntArray(81)
+        grid[0] = solution[0]; grid[10] = solution[10]; grid[20] = solution[20]
+        val fake = Puzzle(
+            id = "cs-no-count",
+            difficulty = Difficulty.Beginner,
+            givens = grid.toList(),
+            solution = solution.toList(),
+        )
+        var s = GameState.forNewGame(fake)
+        val hint = HintEngine.findCandidateSweep(grid)
+            ?: error("expected a sweep on this grid")
+
+        s = GameReducer.beginCandidateSweep(s, hint)
+        s = GameReducer.applyCandidateSweepFill(s)
+        for (plan in hint.plan) {
+            s = GameReducer.advanceCandidateSweepCell(s, plan.cellIdx, plan.doomedDigits, plan.eliminatorPeers)
+        }
+        s = GameReducer.completeCandidateSweep(s, hint, countAsHint = false)
+        assertEquals(0, s.hintCount)
+        // The undo move is still recorded so the player can revert it.
+        assertTrue(s.history.last() is Move.PencilSweep)
+    }
+
+    @Test
+    fun `pending hint advances from highlight to method, then clears`() {
+        val s0 = initial()
+        val grid = IntArray(81) { i -> s0.cells[i].value ?: 0 }
+        val hint = HintEngine.find(grid) as HintEngine.NakedSingle
+
+        var s = GameReducer.setPendingHint(s0, hint, setOf(hint.targetCell))
+        assertEquals(setOf(hint.targetCell), s.pendingHint?.keyCells)
+        assertEquals(false, s.pendingHint?.showCells)
+        assertEquals("Naked Single", s.pendingHint?.techniqueName)
+
+        s = GameReducer.advancePendingHintRevealCells(s)
+        assertEquals(true, s.pendingHint?.showCells)
+
+        // Second advance is a no-op once method is shown.
+        val before = s
+        s = GameReducer.advancePendingHintRevealCells(s)
+        assertSame(before, s)
+
+        s = GameReducer.clearPendingHint(s)
+        assertNull(s.pendingHint)
+    }
+
+    @Test
+    fun `placing a value in the pending-hint target clears the hint`() {
+        val s0 = initial()
+        val grid = IntArray(81) { i -> s0.cells[i].value ?: 0 }
+        val hint = HintEngine.find(grid) as HintEngine.NakedSingle
+        val tr = hint.targetCell / 9
+        val tc = hint.targetCell % 9
+
+        var s = GameReducer.setPendingHint(s0, hint, setOf(hint.targetCell))
+        // Place any digit (correct or not) — the highlight should clear.
+        val wrong = if (hint.solutionDigit == 1) 2 else 1
+        s = GameReducer.selectDigit(s, wrong)
+        s = GameReducer.tapCell(s, tr, tc)
+        assertEquals(wrong, s.cellAt(tr, tc).value)
+        assertNull(s.pendingHint)
+    }
+
+    @Test
+    fun `any cell change clears the pending hint`() {
+        // Whether the player taps a key cell or a different cell — and
+        // whether it's a value placement, a pencil toggle, or a
+        // double-tap clear — the pending hint must disappear.
+        val s0 = initial()
+        val grid = IntArray(81) { i -> s0.cells[i].value ?: 0 }
+        val hint = HintEngine.find(grid) as HintEngine.NakedSingle
+        val emptyIndices = (0 until 81).filter { !s0.cells[it].given && s0.cells[it].value == null }
+        val keys = emptyIndices.take(3).toSet()
+        check(keys.size == 3)
+        val nonKey = emptyIndices.first { it !in keys }
+
+        // 1. Value placement in any key cell.
+        for (key in keys) {
+            var s = GameReducer.setPendingHint(s0, hint, keys)
+            s = GameReducer.selectDigit(s, 1)
+            s = GameReducer.tapCell(s, key / 9, key % 9)
+            assertNull(s.pendingHint, "value in key cell $key should clear")
+        }
+        // 2. Value placement in a non-key cell still clears.
+        var s = GameReducer.setPendingHint(s0, hint, keys)
+        s = GameReducer.selectDigit(s, 1)
+        s = GameReducer.tapCell(s, nonKey / 9, nonKey % 9)
+        assertNull(s.pendingHint, "value in a non-key cell must also clear")
+        // 3. Pencil-mark toggle clears.
+        s = GameReducer.setPendingHint(s0, hint, keys)
+        s = GameReducer.togglePencil(s)
+        s = GameReducer.selectDigit(s, 1)
+        s = GameReducer.tapCell(s, nonKey / 9, nonKey % 9)
+        assertNull(s.pendingHint, "pencil-mark toggle must clear the pending hint")
+        // 4. Double-tap clear on a filled cell clears too.
+        s = initial().let { GameReducer.selectDigit(it, 4) }
+        s = GameReducer.tapCell(s, nonKey / 9, nonKey % 9) // fill it
+        s = GameReducer.setPendingHint(s, hint, keys)
+        s = GameReducer.doubleTapCell(s, nonKey / 9, nonKey % 9)
+        assertNull(s.pendingHint, "double-tap clear must clear the pending hint")
+    }
+
+    @Test
+    fun `lastHint is set on completion and survives an undo`() {
+        val s0 = initial()
+        val grid = IntArray(81) { i -> s0.cells[i].value ?: 0 }
+        val hint = HintEngine.find(grid) as HintEngine.NakedSingle
+
+        var s = GameReducer.beginNakedSingleHint(s0, hint)
+        for (d in 1..9) {
+            s = GameReducer.advanceNakedSingleStep(
+                state = s,
+                activeDigit = d,
+                eliminatorCells = hint.eliminators[d].orEmpty(),
+                eliminate = d != hint.solutionDigit,
+            )
+        }
+        s = GameReducer.completeNakedSingleHint(s, hint)
+        assertEquals(hint, s.lastHint)
+
+        // Undo pops the hint move but keeps lastHint set so Show Again works.
+        s = GameReducer.undo(s)
+        assertEquals(hint, s.lastHint)
+    }
+
+    @Test
+    fun `lastHint clears on any player cell change`() {
+        val s0 = initial()
+        val grid = IntArray(81) { i -> s0.cells[i].value ?: 0 }
+        val hint = HintEngine.find(grid) as HintEngine.NakedSingle
+
+        var s = GameReducer.beginNakedSingleHint(s0, hint)
+        for (d in 1..9) {
+            s = GameReducer.advanceNakedSingleStep(
+                state = s,
+                activeDigit = d,
+                eliminatorCells = hint.eliminators[d].orEmpty(),
+                eliminate = d != hint.solutionDigit,
+            )
+        }
+        s = GameReducer.completeNakedSingleHint(s, hint)
+        assertEquals(hint, s.lastHint)
+
+        // Find any non-given empty cell and place a value there.
+        val targetEmpty = (0 until 81).first {
+            !s.cells[it].given && s.cells[it].value == null
+        }
+        s = GameReducer.selectDigit(s, 1)
+        s = GameReducer.tapCell(s, targetEmpty / 9, targetEmpty % 9)
+        assertNull(s.lastHint, "any cell change must clear lastHint")
+    }
+
+    @Test
+    fun `completion with countAsHint false leaves hintCount unchanged but sets lastHint`() {
+        val s0 = initial()
+        val grid = IntArray(81) { i -> s0.cells[i].value ?: 0 }
+        val hint = HintEngine.find(grid) as HintEngine.NakedSingle
+
+        var s = GameReducer.beginNakedSingleHint(s0, hint)
+        for (d in 1..9) {
+            s = GameReducer.advanceNakedSingleStep(
+                state = s,
+                activeDigit = d,
+                eliminatorCells = hint.eliminators[d].orEmpty(),
+                eliminate = d != hint.solutionDigit,
+            )
+        }
+        s = GameReducer.completeNakedSingleHint(s, hint, countAsHint = false)
+        assertEquals(0, s.hintCount)
+        assertEquals(hint, s.lastHint)
     }
 
     @Test

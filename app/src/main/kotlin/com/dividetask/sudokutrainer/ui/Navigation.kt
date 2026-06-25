@@ -13,10 +13,13 @@ import com.dividetask.sudokutrainer.domain.Difficulty
 import com.dividetask.sudokutrainer.ui.game.GameScreen
 import com.dividetask.sudokutrainer.ui.game.GameViewModel
 import com.dividetask.sudokutrainer.ui.menu.MainMenuScreen
+import com.dividetask.sudokutrainer.ui.test.TestScreen
+import com.dividetask.sudokutrainer.ui.test.TestViewModel
 
 private object Routes {
     const val MENU = "menu"
     const val GAME = "game/{difficulty}"
+    const val TEST = "test"
     fun game(difficulty: Difficulty) = "game/${difficulty.name}"
 }
 
@@ -29,8 +32,12 @@ fun SudokuTrainerApp(repository: PuzzleRepository, config: GameConfig) {
     ) {
         composable(Routes.MENU) {
             MainMenuScreen(
+                showTestButton = config.showTestButton,
                 onStartGame = { difficulty ->
                     navController.navigate(Routes.game(difficulty))
+                },
+                onStartTest = {
+                    navController.navigate(Routes.TEST)
                 },
             )
         }
@@ -46,6 +53,17 @@ fun SudokuTrainerApp(repository: PuzzleRepository, config: GameConfig) {
                 factory = GameViewModel.factory(repository, config, difficulty),
             )
             GameScreen(
+                viewModel = viewModel,
+                onExit = {
+                    navController.popBackStack(Routes.MENU, inclusive = false)
+                },
+            )
+        }
+        composable(Routes.TEST) {
+            val viewModel: TestViewModel = viewModel(
+                factory = TestViewModel.factory(config),
+            )
+            TestScreen(
                 viewModel = viewModel,
                 onExit = {
                     navController.popBackStack(Routes.MENU, inclusive = false)

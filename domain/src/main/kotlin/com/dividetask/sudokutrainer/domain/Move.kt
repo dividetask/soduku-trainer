@@ -1,6 +1,6 @@
 package com.dividetask.sudokutrainer.domain
 
-/** A pencil mark that was auto-cleared from a peer cell during a Blue/Solve write. */
+/** A pencil mark added or cleared on a specific cell — used by undo. */
 data class AutoClearedMark(
     val row: Int,
     val col: Int,
@@ -9,12 +9,10 @@ data class AutoClearedMark(
 )
 
 sealed interface Move {
-    val row: Int
-    val col: Int
 
     data class SetValue(
-        override val row: Int,
-        override val col: Int,
+        val row: Int,
+        val col: Int,
         val newValue: Int,
         val newValueColor: GuessColor,
         val clearedMarks: Map<Int, GuessColor>,
@@ -24,8 +22,8 @@ sealed interface Move {
     }
 
     data class ClearValue(
-        override val row: Int,
-        override val col: Int,
+        val row: Int,
+        val col: Int,
         val prevValue: Int,
         val prevValueColor: GuessColor,
     ) : Move {
@@ -33,12 +31,22 @@ sealed interface Move {
     }
 
     data class TogglePencilMark(
-        override val row: Int,
-        override val col: Int,
+        val row: Int,
+        val col: Int,
         val digit: Int,
         val added: Boolean,
         val markColor: GuessColor,
     ) : Move {
         init { require(digit in 1..9) }
     }
+
+    /**
+     * One Candidate Sweep step: any number of cells gained or lost pencil
+     * marks atomically. [addedMarks] are removed on undo; [removedMarks]
+     * are restored.
+     */
+    data class PencilSweep(
+        val addedMarks: List<AutoClearedMark>,
+        val removedMarks: List<AutoClearedMark>,
+    ) : Move
 }
