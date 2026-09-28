@@ -61,24 +61,36 @@ so the Android Gradle Plugin isn't required.
 
 ## Regenerating Puzzles
 
-The 150-entry puzzle pool lives at
-`app/src/main/assets/puzzles/v1.json` and was produced by the offline
-tool under `tools/puzzle-gen/`. The generator is *not* shipped inside
-the app.
+The puzzle pool (1,000 puzzles per difficulty level, 9,000 in total)
+lives at `app/src/main/assets/puzzles/v3.json` and was produced by the
+offline tool under `tools/puzzle-gen/`. The generator is *not* shipped
+inside the app.
 
 To regenerate:
 
 ```
 ./gradlew -PincludeApp=false :tools:puzzle-gen:run \
-    --args "--count 150 --seed 20260415 --out app/src/main/assets/puzzles/v1.json"
+    --args="--count 1000 --out app/src/main/assets/puzzles/v3.json"
 ```
 
+Every generated puzzle is graded by `LogicSolver` and kept under the
+level it lands on, so no work is thrown away. Hard (6) and Expert (7)
+are by far the rarest outcomes and dominate the run time.
+
 Arguments:
-- `--count N` — number of puzzles to generate (default 150).
-- `--empties N` — target empty-cell count per puzzle (default 46, i.e.
-  35 givens). Uniqueness is verified by solver on every removal.
-- `--seed N` — optional RNG seed for reproducible output.
+- `--count N` — puzzles per level (default 20).
+- `--level N` — only generate this level (default: all of 1–9).
+- `--threads N` — worker threads (default: all CPU cores).
+- `--max-minutes N` — stop after this long even if short (default 60).
+- `--seed N` — optional RNG seed (per thread; not reproducible across
+  thread counts).
+- `--version N` — file version and id prefix (default 3).
 - `--out PATH` — output JSON path, relative to the repo root.
+
+In the app, each dealt puzzle is also passed through
+`PuzzleTransformer`, which applies random Sudoku symmetries (digit
+relabelling, row/column/band shuffles, transpose) that preserve its
+solution logic and difficulty.
 
 ## Design Documentation
 

@@ -87,7 +87,7 @@ class SudokuGenerator(private val random: Random = Random.Default) {
     }
 
     companion object {
-        private fun emptyRangeForLevel(level: Int): Pair<Int, Int> = when (level) {
+        fun emptyRangeForLevel(level: Int): Pair<Int, Int> = when (level) {
             1 -> 34 to 46
             2 -> 36 to 50
             3 -> 38 to 56

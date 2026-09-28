@@ -3,9 +3,10 @@ package com.dividetask.sudokutrainer.puzzlegen
 import com.dividetask.sudokutrainer.domain.Difficulty
 import com.dividetask.sudokutrainer.domain.Puzzle
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.thread
 import kotlin.random.Random
 import kotlin.system.measureTimeMillis
 
@@ -14,10 +15,12 @@ import kotlin.system.measureTimeMillis
  *
  * Usage:
  *   ./gradlew -PincludeApp=false :tools:puzzle-gen:run \
- *       --args "--count 20 --level 3 --out app/src/main/assets/puzzles/v2.json"
+ *       --args "--count 500 --out app/src/main/assets/puzzles/v3.json"
  *
- * If --level is omitted, generates [count] puzzles at each level 1–9
- * (total = count * 9) and writes them all to one file.
+ * Every generated puzzle is graded and kept under whatever level it
+ * lands on (rather than discarded when it misses a target level), until
+ * each requested level holds [count] unique puzzles or [--max-minutes]
+ * elapses. Work is spread over [--threads] worker threads.
  */
 
 @Serializable
@@ -25,86 +28,102 @@ private data class PuzzleFile(val version: Int, val puzzles: List<Puzzle>)
 
 private data class Args(
     val countPerLevel: Int,
-    val targetLevel: Int?,     // null = all levels
+    val levels: List<Int>,
     val seed: Long?,
     val outPath: String,
-    val maxAttempts: Int,
+    val threads: Int,
+    val maxMinutes: Int,
+    val version: Int,
 )
 
 private fun parseArgs(argv: Array<String>): Args {
     var count = 20
-    var level: Int? = null
+    var levels = (1..9).toList()
     var seed: Long? = null
-    var out = "app/src/main/assets/puzzles/v2.json"
-    var maxAttempts = 500
+    var out = "app/src/main/assets/puzzles/v3.json"
+    var threads = Runtime.getRuntime().availableProcessors()
+    var maxMinutes = 60
+    var version = 3
     var i = 0
     while (i < argv.size) {
         when (argv[i]) {
             "--count" -> { count = argv[i + 1].toInt(); i += 2 }
-            "--level" -> { level = argv[i + 1].toInt(); i += 2 }
+            "--level" -> { levels = listOf(argv[i + 1].toInt()); i += 2 }
             "--seed" -> { seed = argv[i + 1].toLong(); i += 2 }
             "--out" -> { out = argv[i + 1]; i += 2 }
-            "--max-attempts" -> { maxAttempts = argv[i + 1].toInt(); i += 2 }
+            "--threads" -> { threads = argv[i + 1].toInt(); i += 2 }
+            "--max-minutes" -> { maxMinutes = argv[i + 1].toInt(); i += 2 }
+            "--version" -> { version = argv[i + 1].toInt(); i += 2 }
             else -> error("Unknown arg: ${argv[i]}")
         }
     }
-    return Args(count, level, seed, out, maxAttempts)
+    return Args(count, levels, seed, out, threads, maxMinutes, version)
 }
 
 fun main(argv: Array<String>) {
     val args = parseArgs(argv)
-    val random = if (args.seed != null) Random(args.seed) else Random.Default
-    val generator = SudokuGenerator(random)
+    val buckets = args.levels.associateWith { LinkedHashMap<List<Int>, IntArray>() }
+    val lock = Any()
+    val done = AtomicBoolean(false)
+    val deadline = System.currentTimeMillis() + args.maxMinutes * 60_000L
 
-    val levels = if (args.targetLevel != null) {
-        listOf(args.targetLevel)
-    } else {
-        (1..9).toList()
-    }
+    fun needed(): List<Int> = buckets.filter { it.value.size < args.countPerLevel }.keys.toList()
 
-    val puzzles = mutableListOf<Puzzle>()
-    var idCounter = 0
+    println("Generating ${args.countPerLevel} puzzles for levels ${args.levels} " +
+        "on ${args.threads} threads...")
 
     val totalMs = measureTimeMillis {
-        for (level in levels) {
-            val difficulty = Difficulty.fromLevel(level)
-            println("Generating ${args.countPerLevel} puzzles at level $level (${difficulty.label})...")
-            var generated = 0
-            var attempts = 0
-            while (generated < args.countPerLevel && attempts < args.maxAttempts) {
-                attempts++
-                val result = generator.generateAtLevel(level, maxAttempts = 1)
-                    ?: continue
-                idCounter++
-                val emptyCount = result.givens.count { it == 0 }
-                val puzzle = Puzzle(
-                    id = "v2-%04d".format(idCounter),
-                    difficulty = difficulty,
-                    givens = result.givens.toList(),
-                    solution = result.solution.toList(),
-                )
-                puzzles += puzzle
-                generated++
-                println("  [${generated}/${args.countPerLevel}] ${puzzle.id} " +
-                    "level=$level empties=$emptyCount (attempt $attempts)")
+        val workers = (0 until args.threads).map { t ->
+            thread(name = "gen-$t") {
+                val random = if (args.seed != null) Random(args.seed + t) else Random.Default
+                val generator = SudokuGenerator(random)
+                while (!done.get()) {
+                    // Aim at a random level that still needs puzzles; keep
+                    // the result wherever it actually grades.
+                    val aim = synchronized(lock) { needed() }.randomOrNull(random) ?: break
+                    val (lo, hi) = SudokuGenerator.emptyRangeForLevel(aim)
+                    val result = generator.generateGraded(lo + random.nextInt(hi - lo + 1))
+                    synchronized(lock) {
+                        val bucket = buckets[result.level] ?: return@synchronized
+                        if (bucket.size >= args.countPerLevel) return@synchronized
+                        if (bucket.putIfAbsent(result.givens.toList(), result.solution) == null &&
+                            bucket.size % 100 == 0
+                        ) {
+                            println("  level ${result.level}: ${bucket.size}/${args.countPerLevel}")
+                        }
+                        if (needed().isEmpty()) done.set(true)
+                    }
+                    if (System.currentTimeMillis() > deadline) done.set(true)
+                }
             }
-            if (generated < args.countPerLevel) {
-                println("  WARNING: only generated $generated/${args.countPerLevel} at level $level " +
-                    "after $attempts attempts")
-            }
+        }
+        workers.forEach { it.join() }
+    }
+
+    val prefix = "v${args.version}"
+    var idCounter = 0
+    val puzzles = args.levels.flatMap { level ->
+        buckets.getValue(level).map { (givens, solution) ->
+            idCounter++
+            Puzzle(
+                id = "$prefix-%05d".format(idCounter),
+                difficulty = Difficulty.fromLevel(level),
+                givens = givens,
+                solution = solution.toList(),
+            )
         }
     }
 
     val json = Json { prettyPrint = false; encodeDefaults = true }
-    val file = PuzzleFile(version = 2, puzzles = puzzles)
     val out = File(args.outPath)
     out.parentFile?.mkdirs()
-    out.writeText(json.encodeToString(file))
+    out.writeText(json.encodeToString(PuzzleFile.serializer(), PuzzleFile(args.version, puzzles)))
 
     println("\nWrote ${puzzles.size} puzzles to ${out.absolutePath}")
-    for (level in levels) {
-        val count = puzzles.count { it.difficulty.level == level }
-        println("  Level $level (${Difficulty.fromLevel(level).label}): $count")
+    for (level in args.levels) {
+        val count = buckets.getValue(level).size
+        val warn = if (count < args.countPerLevel) "  (WARNING: short of ${args.countPerLevel})" else ""
+        println("  Level $level (${Difficulty.fromLevel(level).label}): $count$warn")
     }
     println("Total time: ${totalMs / 1000}s")
 }

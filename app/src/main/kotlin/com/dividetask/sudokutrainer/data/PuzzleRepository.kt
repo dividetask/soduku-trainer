@@ -52,6 +52,6 @@ class PuzzleRepository(private val context: Context) {
     }
 
     companion object {
-        private const val ASSET_PATH = "puzzles/v2.json"
+        private const val ASSET_PATH = "puzzles/v3.json"
     }
 }
