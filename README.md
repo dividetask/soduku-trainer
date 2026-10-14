@@ -92,6 +92,14 @@ In the app, each dealt puzzle is also passed through
 relabelling, row/column/band shuffles, transpose) that preserve its
 solution logic and difficulty.
 
+## App Icon
+
+The launcher icon is generated from `tools/app-icon/source.png`. To change
+it, replace that file and rerun `tools/app-icon/generate.py` (needs Pillow;
+usage is in the script header). It writes an adaptive icon: a background
+gradient taken from the artwork's blue tile, and the artwork itself as the
+foreground at 68% of the canvas so circle masks don't clip the pencil.
+
 ## Design Documentation
 
 All design documents live under [`docs/`](docs/):
