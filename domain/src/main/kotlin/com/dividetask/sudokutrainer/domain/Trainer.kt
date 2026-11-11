@@ -100,7 +100,7 @@ data class NoteRef(val cell: Int, val digit: Int)
  *   up to this point) and [marks] its pencil marks (all empty when the
  *   method doesn't use notes).
  * - [placements] (placement methods) are the (cell, digit) placements
- *   the method produces; any one of them completes the drill.
+ *   the method produces; the drill is complete once all are made.
  * - [instances] (note methods) are the distinct applications of the
  *   method on this board, as hints that can be animated. The drill is
  *   complete once every elimination of any one instance is made.
@@ -279,25 +279,22 @@ object TrainerJudge {
      * Compare [state] with the drill's starting board. Judging the whole
      * board (rather than single moves) means undo needs no special care.
      *
-     * - Any newly placed value must be one of the drill's placements;
-     *   one correct placement completes a placement drill.
-     * - In note drills, notes may only be removed, and only ones that
-     *   some instance of the method eliminates. The drill is complete
-     *   once every elimination of any single instance is made.
+     * - Placement drills: every placed value must come from the method —
+     *   one of the drill's starting placements, or a single that earlier
+     *   placements created. The drill is complete once every starting
+     *   placement is made.
+     * - Note drills: no value may be placed, and notes may only be
+     *   removed, and only ones that some instance of the method
+     *   eliminates. The drill is complete once every elimination of any
+     *   single instance is made.
      */
     fun judge(drill: TrainerDrill, state: GameState): Verdict {
-        var placedCorrectly = false
+        if (!drill.method.usesNotes) return judgePlacements(drill, state)
+
         for (i in 0 until 81) {
             val v = state.cells[i].value ?: continue
-            if (drill.grid[i] == v) continue
-            if (NoteRef(i, v) !in drill.placements) return Verdict.Wrong
-            placedCorrectly = true
+            if (drill.grid[i] != v) return Verdict.Wrong
         }
-        if (!drill.method.usesNotes) {
-            return if (placedCorrectly) Verdict.Complete else Verdict.InProgress
-        }
-        if (placedCorrectly) return Verdict.Complete
-
         val removed = mutableSetOf<NoteRef>()
         for (i in 0 until 81) {
             if (state.cells[i].value != null) continue
@@ -312,13 +309,65 @@ object TrainerJudge {
         else Verdict.InProgress
     }
 
+    /** Starting placements still to make in a placement drill (0 for note drills). */
+    fun remaining(drill: TrainerDrill, state: GameState): Int =
+        drill.placements.count { state.cells[it.cell].value != it.digit }
+
+    private fun judgePlacements(drill: TrainerDrill, state: GameState): Verdict {
+        val grid = IntArray(81) { state.cells[it].value ?: 0 }
+        for (i in 0 until 81) {
+            val v = grid[i]
+            if (v == 0 || drill.grid[i] == v) continue
+            if (NoteRef(i, v) in drill.placements) continue
+            if (!isSingle(drill.method, grid, i, v) || drill.puzzle.solution[i] != v) return Verdict.Wrong
+        }
+        return if (remaining(drill, state) == 0) Verdict.Complete else Verdict.InProgress
+    }
+
+    /**
+     * Whether [digit] at [cell] is a single of [method] given the rest of
+     * [grid] — used for singles that the player's own placements opened up.
+     */
+    private fun isSingle(method: TrainerMethod, grid: IntArray, cell: Int, digit: Int): Boolean {
+        val g = grid.copyOf().also { it[cell] = 0 }
+        val r = cell / 9; val c = cell % 9
+        if (!SudokuSolver.isValidPlacement(g, r, c, digit)) return false
+        return when (method) {
+            TrainerMethod.NakedSingle ->
+                (1..9).count { SudokuSolver.isValidPlacement(g, r, c, it) } == 1
+            TrainerMethod.HiddenSingle -> unitsOf(cell).any { unit ->
+                unit.none { o -> o != cell && g[o] == 0 && SudokuSolver.isValidPlacement(g, o / 9, o % 9, digit) }
+            }
+            else -> false
+        }
+    }
+
+    private fun unitsOf(cell: Int): List<List<Int>> {
+        val r = cell / 9; val c = cell % 9
+        val br = r / 3 * 3; val bc = c / 3 * 3
+        return listOf(
+            (0 until 9).map { r * 9 + it },
+            (0 until 9).map { it * 9 + c },
+            (0 until 9).map { (br + it / 3) * 9 + bc + it % 3 },
+        )
+    }
+
     /**
      * The hint to show when the player asks for one. For note drills it
      * is the instance closest to done, so earlier correct removals
      * aren't wasted.
      */
     fun hintFor(drill: TrainerDrill, state: GameState): HintEngine.Hint? {
-        if (drill.instances.isEmpty()) return drill.placementHints.firstOrNull()
+        if (drill.instances.isEmpty()) {
+            return drill.placementHints.firstOrNull { h ->
+                val target = when (h) {
+                    is HintEngine.NakedSingle -> h.targetCell
+                    is HintEngine.HiddenSingle -> h.targetCell
+                    else -> return@firstOrNull false
+                }
+                state.cells[target].value == null
+            }
+        }
         val best = drill.instances.indices.maxBy { k ->
             drill.instanceEliminations[k].count { it.digit !in state.cells[it.cell].pencilMarks }
         }

@@ -55,9 +55,11 @@ tries another puzzle. The board is shown at that point:
 
 `TrainerJudge` compares the board with the drill's starting position:
 
-- **Placement methods:** placing a value the method produces (in any
-  cell where it applies) completes the drill. Any other value — even a
-  correct one — flashes red and is undone.
+- **Placement methods:** every single on the starting board must be
+  placed; the top bar counts how many are left. A single that the
+  player's own placements open up is accepted too. Any other value —
+  even a correct one found by a different method — flashes red and is
+  undone.
 - **Note methods:** the player removes notes. Removing a note that no
   application of the method eliminates, adding a note, or placing a
   value flashes red and is undone. The drill completes once **every**

@@ -81,7 +81,10 @@ fun TrainerScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            TopBar(label = trainerLabel(status, state, method), onMainMenu = onMainMenu)
+            TopBar(
+                label = trainerLabel(status, state, method, state?.let(viewModel::remaining) ?: 0),
+                onMainMenu = onMainMenu,
+            )
             Text(method.techniqueName, style = MaterialTheme.typography.headlineSmall)
             Text(method.explanation, style = MaterialTheme.typography.bodyMedium)
 
@@ -137,11 +140,17 @@ fun TrainerScreen(
     }
 }
 
-private fun trainerLabel(status: TrainerViewModel.Status, state: GameState?, method: TrainerMethod): String =
-    when {
-        status == TrainerViewModel.Status.Solved -> "Correct! Next puzzle…"
-        status == TrainerViewModel.Status.Loading -> "Finding a puzzle…"
-        state?.hintUi == HintUi.ErrorFlash -> "Not a ${method.techniqueName} move"
-        state?.pendingHint != null -> "Look at the highlighted cells"
-        else -> ""
-    }
+private fun trainerLabel(
+    status: TrainerViewModel.Status,
+    state: GameState?,
+    method: TrainerMethod,
+    remaining: Int,
+): String = when {
+    status == TrainerViewModel.Status.Solved -> "Correct! Next puzzle…"
+    status == TrainerViewModel.Status.Loading -> "Finding a puzzle…"
+    state?.hintUi == HintUi.ErrorFlash -> "Not a ${method.techniqueName}"
+    state?.pendingHint != null -> "Look at the highlighted cells"
+    // Placement drills need every single placed; show how many are left.
+    remaining > 0 -> "$remaining left to place"
+    else -> ""
+}

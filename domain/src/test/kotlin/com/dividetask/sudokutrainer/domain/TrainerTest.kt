@@ -32,6 +32,22 @@ class TrainerTest {
 
     private fun marksOf(drill: TrainerDrill) = drill.marks.toTypedArray()
 
+    /** A placement drill with at least two starting singles. */
+    private fun drillWithSeveralSingles(method: TrainerMethod): TrainerDrill {
+        val random = Random(method.ordinal + 1000)
+        repeat(200) {
+            val d = TrainerGenerator.generate(method, { level -> pool.getValue(level).random(random) }, random)
+            if (d != null && d.placements.size >= 2) return d
+        }
+        error("no $method drill with two or more singles")
+    }
+
+    private fun target(hint: HintEngine.Hint): Int = when (hint) {
+        is HintEngine.NakedSingle -> hint.targetCell
+        is HintEngine.HiddenSingle -> hint.targetCell
+        else -> error("not a single: $hint")
+    }
+
     @ParameterizedTest
     @EnumSource(TrainerMethod::class)
     fun `generated drill has the method as its easiest step`(method: TrainerMethod) {
@@ -59,12 +75,64 @@ class TrainerTest {
                 assertEquals(TrainerJudge.Verdict.Complete, TrainerJudge.judge(drill, removeNotes(start, elims)))
             }
         } else {
-            for (p in drill.placements) {
-                assertEquals(drill.puzzle.solution[p.cell], p.digit)
-                assertEquals(TrainerJudge.Verdict.Complete, TrainerJudge.judge(drill, place(start, p)))
-            }
+            for (p in drill.placements) assertEquals(drill.puzzle.solution[p.cell], p.digit)
         }
         assertEquals(TrainerJudge.Verdict.InProgress, TrainerJudge.judge(drill, start))
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = TrainerMethod::class, names = ["NakedSingle", "HiddenSingle"])
+    fun `a placement drill needs every single placed`(method: TrainerMethod) {
+        val drill = drillWithSeveralSingles(method)
+        val start = drill.toGameState()
+        val all = drill.placements.toList()
+        var s = start
+        for ((n, p) in all.withIndex()) {
+            assertEquals(all.size - n, TrainerJudge.remaining(drill, s))
+            assertEquals(TrainerJudge.Verdict.InProgress, TrainerJudge.judge(drill, s))
+            s = place(s, p)
+        }
+        assertEquals(0, TrainerJudge.remaining(drill, s))
+        assertEquals(TrainerJudge.Verdict.Complete, TrainerJudge.judge(drill, s))
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = TrainerMethod::class, names = ["NakedSingle", "HiddenSingle"])
+    fun `hint points at a single that is still unplaced`(method: TrainerMethod) {
+        val drill = drillWithSeveralSingles(method)
+        val first = drill.placements.first { p ->
+            target(TrainerJudge.hintFor(drill, drill.toGameState())!!) == p.cell
+        }
+        val after = place(drill.toGameState(), first)
+        val next = TrainerJudge.hintFor(drill, after)!!
+        assertTrue(target(next) != first.cell)
+        assertTrue(drill.placements.any { it.cell == target(next) })
+    }
+
+    @Test
+    fun `a naked single opened up by the player's own placements is accepted`() {
+        // Find a drill where placing the starting singles creates a new one.
+        val random = Random(99)
+        repeat(200) {
+            val drill = TrainerGenerator.generate(
+                TrainerMethod.NakedSingle, { level -> pool.getValue(level).random(random) }, random,
+            ) ?: return@repeat
+            var s = drill.toGameState()
+            for (p in drill.placements) s = place(s, p)
+            val grid = IntArray(81) { s.cells[it].value ?: 0 }
+            val fresh = HintEngine.allNakedSingles(grid).firstOrNull() ?: return@repeat
+            val p = NoteRef(fresh.targetCell, fresh.solutionDigit)
+            assertTrue(p !in drill.placements)
+            assertEquals(TrainerJudge.Verdict.Complete, TrainerJudge.judge(drill, place(s, p)))
+            // A correct value that is no naked single is still wrong.
+            val other = (0 until 81).first { i ->
+                grid[i] == 0 && i != p.cell && HintEngine.allNakedSingles(grid).none { it.targetCell == i }
+            }
+            val wrong = place(place(s, p), NoteRef(other, drill.puzzle.solution[other]))
+            assertEquals(TrainerJudge.Verdict.Wrong, TrainerJudge.judge(drill, wrong))
+            return
+        }
+        error("no drill opened up a new naked single")
     }
 
     @ParameterizedTest

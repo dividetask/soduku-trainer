@@ -92,6 +92,9 @@ class TrainerViewModel(
         }
     }
 
+    /** Singles still to place in a placement drill; 0 for note drills. */
+    fun remaining(state: GameState): Int = drill?.let { TrainerJudge.remaining(it, state) } ?: 0
+
     private fun onSolved() {
         _status.value = Status.Solved
         viewModelScope.launch {
