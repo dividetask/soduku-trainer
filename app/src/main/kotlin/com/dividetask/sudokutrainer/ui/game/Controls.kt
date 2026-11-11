@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -172,21 +173,21 @@ fun ColorPickerRow(
     }
 }
 
+/**
+ * The game's action buttons in two columns: Undo / Hint on top,
+ * Show Again / Clear below.
+ */
 @Composable
 fun ActionRow(
     state: GameState,
-    isSolveReady: Boolean,
     onUndo: () -> Unit,
     onClear: () -> Unit,
-    onSweep: () -> Unit,
     onHint: () -> Unit,
     onShowAgain: () -> Unit,
-    onGiveUpOrSolve: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val canUndo = state.history.isNotEmpty() && state.phase == GameState.Phase.Playing
-    val busy = state.phase != GameState.Phase.Playing
     val playing = state.phase == GameState.Phase.Playing
+    val canUndo = state.history.isNotEmpty() && playing
     // The hint button stays enabled while a hint is animating so pressing
     // it again skips the animation to the final placement.
     val canHint = playing || state.phase == GameState.Phase.Hinting
@@ -207,26 +208,7 @@ fun ActionRow(
             ) {
                 Text("Undo")
             }
-            Button(
-                onClick = onSweep,
-                enabled = playing,
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF1565C0),
-                ),
-            ) {
-                Text("Sweep")
-            }
-            Button(
-                onClick = onHint,
-                enabled = canHint,
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF2E7D32),
-                ),
-            ) {
-                Text(if (state.phase == GameState.Phase.Hinting) "Skip" else "Hint")
-            }
+            HintButton(state, enabled = canHint, onHint = onHint, modifier = Modifier.weight(1f))
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -252,22 +234,51 @@ fun ActionRow(
             ) {
                 Text("Clear")
             }
-            Button(
-                onClick = onGiveUpOrSolve,
-                enabled = !busy,
-                modifier = Modifier.weight(1f),
-                colors = if (isSolveReady) {
-                    ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                    )
-                } else {
-                    ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary,
-                    )
-                },
-            ) {
-                Text(if (isSolveReady) "Solve" else "Give Up")
-            }
         }
+    }
+}
+
+/** Hint, relabeled Skip while a hint animation plays. */
+@Composable
+fun HintButton(
+    state: GameState,
+    enabled: Boolean,
+    onHint: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Button(
+        onClick = onHint,
+        enabled = enabled,
+        modifier = modifier,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFF2E7D32),
+        ),
+    ) {
+        Text(if (state.phase == GameState.Phase.Hinting) "Skip" else "Hint")
+    }
+}
+
+/** Row across the top of a play screen: Main menu on the left, then [label]. */
+@Composable
+fun TopBar(
+    label: String,
+    onMainMenu: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedButton(onClick = onMainMenu) {
+            Text("Main menu")
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.weight(1f),
+        )
     }
 }

@@ -1,21 +1,16 @@
 package com.dividetask.sudokutrainer.ui.game
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dividetask.sudokutrainer.domain.GameState
@@ -32,6 +27,8 @@ fun GameScreen(
     LaunchedEffect(exit) {
         if (exit) onExit()
     }
+    // System back saves the game the same way the Main menu button does.
+    BackHandler { viewModel.onMainMenu() }
 
     Scaffold { inner ->
         Box(
@@ -45,7 +42,7 @@ fun GameScreen(
                     .padding(horizontal = 12.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                HintLabel(state)
+                TopBar(label = hintLabel(state), onMainMenu = viewModel::onMainMenu)
                 Board(
                     state = state,
                     onCellTap = viewModel::onCellTapped,
@@ -63,15 +60,10 @@ fun GameScreen(
                 )
                 ActionRow(
                     state = state,
-                    isSolveReady = viewModel.isReadyToSolve,
                     onUndo = viewModel::onUndo,
                     onClear = viewModel::onClear,
-                    onSweep = viewModel::onSweep,
                     onHint = viewModel::onHint,
                     onShowAgain = viewModel::onShowAgain,
-                    onGiveUpOrSolve = {
-                        if (viewModel.isReadyToSolve) viewModel.onSolve() else viewModel.onGiveUp()
-                    },
                 )
             }
 
@@ -87,31 +79,14 @@ fun GameScreen(
     }
 }
 
-@Composable
-private fun HintLabel(state: GameState) {
-    val pending = state.pendingHint
-    val ui = state.hintUi
-    val text = when (ui) {
-        is HintUi.NakedSingle -> "Naked Single"
-        is HintUi.HiddenSingle -> "Hidden Single"
-        is HintUi.NoteSingle -> "Note Single"
-        is HintUi.CandidateSweep -> "Candidate Sweep"
-        is HintUi.Elimination -> ui.techniqueName
-        HintUi.NoHintFlash -> "No hint available"
-        null -> pending?.techniqueName.orEmpty()
-    }
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(28.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (text.isNotEmpty()) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-        }
-    }
+/** The technique being shown, or a flash message, for the top bar. */
+internal fun hintLabel(state: GameState): String = when (val ui = state.hintUi) {
+    is HintUi.NakedSingle -> "Naked Single"
+    is HintUi.HiddenSingle -> "Hidden Single"
+    is HintUi.NoteSingle -> "Note Single"
+    is HintUi.CandidateSweep -> "Candidate Sweep"
+    is HintUi.Elimination -> ui.techniqueName
+    HintUi.NoHintFlash -> "No hint available"
+    HintUi.ErrorFlash -> "Incorrect"
+    null -> state.pendingHint?.techniqueName.orEmpty()
 }

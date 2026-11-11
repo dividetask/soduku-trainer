@@ -12,7 +12,6 @@ data class GameConfig(
     val sweepCellMs: Long = 150,
     val pendingHintMs: Long = 10_000,
     val showAgainMultiplier: Float = 3f,
-    val showTestButton: Boolean = true,
 ) {
     companion object {
         fun loadFromAssets(context: Context): GameConfig {
@@ -41,7 +40,6 @@ data class GameConfig(
                 sweepCellMs = map["sweep_cell_ms"]?.toLongOrNull() ?: 150,
                 pendingHintMs = map["pending_hint_ms"]?.toLongOrNull() ?: 10_000,
                 showAgainMultiplier = map["show_again_multiplier"]?.toFloatOrNull() ?: 3f,
-                showTestButton = map["show_test_button"]?.toBooleanStrictOrNull() ?: true,
             )
         }
     }

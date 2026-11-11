@@ -44,7 +44,7 @@ fun Board(
     val density = LocalDensity.current
     val hint = state.hintUi
     val gridBg = when (hint) {
-        HintUi.NoHintFlash -> Color(0xFFFFCDD2) // red flash
+        HintUi.NoHintFlash, HintUi.ErrorFlash -> Color(0xFFFFCDD2) // red flash
         else -> Color.White
     }
     val gridLine = Color(0xFFB0BEC5)

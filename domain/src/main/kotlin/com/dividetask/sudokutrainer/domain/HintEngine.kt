@@ -253,7 +253,43 @@ object HintEngine {
         return null
     }
 
-    private fun findNakedSingle(grid: IntArray): NakedSingle? {
+    /**
+     * Every instance of the elimination technique named [techniqueName]
+     * (as in [Hint.techniqueName]) on this board, in search order — so
+     * the first entry is the one [find] would return. Instances whose
+     * eliminations are identical are reported once. Empty for unknown
+     * names and for the placement techniques.
+     */
+    fun allEliminations(
+        techniqueName: String,
+        grid: IntArray,
+        marks: Array<Set<Int>>? = null,
+    ): List<EliminationHint> {
+        require(grid.size == 81)
+        require(marks == null || marks.size == 81)
+        val cands = candidateGrid(grid, marks)
+        val all: List<EliminationHint> = when (techniqueName) {
+            "Naked Pair" -> allNakedPair(grid, cands)
+            "Hidden Pair" -> allHiddenPair(grid, cands)
+            "Pointing Pair" -> allPointingPair(grid, cands)
+            "Box-Line Reduction" -> allBoxLineReduction(grid, cands)
+            "Naked Triple" -> allNakedTriple(grid, cands)
+            "Hidden Triple" -> allHiddenTriple(grid, cands)
+            "X-Wing" -> allXWing(grid, cands)
+            "Empty Rectangle" -> allEmptyRectangle(grid, cands)
+            "Swordfish" -> allSwordfish(grid, cands)
+            "XY-Wing" -> allXYWing(grid, cands)
+            else -> emptyList()
+        }
+        return all.distinctBy { h -> h.plan.flatMap { s -> s.doomedDigits.map { s.cellIdx * 10 + it } }.toSet() }
+    }
+
+    private fun findNakedSingle(grid: IntArray): NakedSingle? = scanNakedSingle(grid) { true }
+
+    /** Every NakedSingle on [grid], in the order [find] would consider them. */
+    fun allNakedSingles(grid: IntArray): List<NakedSingle> = buildList { scanNakedSingle(grid) { add(it); false } }
+
+    private fun scanNakedSingle(grid: IntArray, emit: (NakedSingle) -> Boolean): NakedSingle? {
         for (idx in 0 until 81) {
             if (grid[idx] != 0) continue
             val row = idx / 9
@@ -269,16 +305,21 @@ object HintEngine {
                 if (d == solution) continue
                 eliminators[d] = peersHolding(grid, row, col, d)
             }
-            return NakedSingle(
+            NakedSingle(
                 targetCell = idx,
                 solutionDigit = solution,
                 eliminators = eliminators,
-            )
+            ).let { if (emit(it)) return it }
         }
         return null
     }
 
-    private fun findHiddenSingle(grid: IntArray): HiddenSingle? {
+    private fun findHiddenSingle(grid: IntArray): HiddenSingle? = scanHiddenSingle(grid) { true }
+
+    /** Every HiddenSingle on [grid], in the order [find] would consider them. */
+    fun allHiddenSingles(grid: IntArray): List<HiddenSingle> = buildList { scanHiddenSingle(grid) { add(it); false } }
+
+    private fun scanHiddenSingle(grid: IntArray, emit: (HiddenSingle) -> Boolean): HiddenSingle? {
         // Iteration order encodes the tie-break: boxes are tried before
         // rows, rows before columns — so when the same digit is a hidden
         // single in multiple units the box deduction wins.
@@ -308,12 +349,12 @@ object HintEngine {
                         put(idx, peersOutsideUnitHolding(grid, idx, unitSet, d))
                     }
                 }
-                return HiddenSingle(
+                HiddenSingle(
                     targetCell = target,
                     solutionDigit = d,
                     unit = unit,
                     eliminators = eliminators,
-                )
+                ).let { if (emit(it)) return it }
             }
         }
         return null
@@ -424,7 +465,18 @@ object HintEngine {
             }
         }
 
-    internal fun findNakedPair(grid: IntArray, cands: Array<Set<Int>>): NakedPair? {
+    internal fun findNakedPair(grid: IntArray, cands: Array<Set<Int>>): NakedPair? =
+        scanNakedPair(grid, cands) { true }
+
+    internal fun allNakedPair(grid: IntArray, cands: Array<Set<Int>>): List<NakedPair> =
+        buildList { scanNakedPair(grid, cands) { add(it); false } }
+
+    /** Calls [emit] on each instance in search order; stops once it returns true. */
+    private fun scanNakedPair(
+        grid: IntArray,
+        cands: Array<Set<Int>>,
+        emit: (NakedPair) -> Boolean,
+    ): NakedPair? {
         for (unit in UNITS_ORDERED) {
             val pairCells = unit.cells.filter { grid[it] == 0 && cands[it].size == 2 }
             for (i in pairCells.indices) {
@@ -444,19 +496,30 @@ object HintEngine {
                         )
                     }
                     if (plan.isEmpty()) continue
-                    return NakedPair(
+                    NakedPair(
                         keyCells = setOf(a, b),
                         unitCells = unit.cells.toSet(),
                         plan = plan,
                         pairDigits = digits,
-                    )
+                    ).let { if (emit(it)) return it }
                 }
             }
         }
         return null
     }
 
-    internal fun findHiddenPair(grid: IntArray, cands: Array<Set<Int>>): HiddenPair? {
+    internal fun findHiddenPair(grid: IntArray, cands: Array<Set<Int>>): HiddenPair? =
+        scanHiddenPair(grid, cands) { true }
+
+    internal fun allHiddenPair(grid: IntArray, cands: Array<Set<Int>>): List<HiddenPair> =
+        buildList { scanHiddenPair(grid, cands) { add(it); false } }
+
+    /** Calls [emit] on each instance in search order; stops once it returns true. */
+    private fun scanHiddenPair(
+        grid: IntArray,
+        cands: Array<Set<Int>>,
+        emit: (HiddenPair) -> Boolean,
+    ): HiddenPair? {
         for (unit in UNITS_ORDERED) {
             val unsolved = unit.cells.filter { grid[it] == 0 }
             val digitCells: Map<Int, List<Int>> = (1..9).associateWith { d ->
@@ -485,19 +548,30 @@ object HintEngine {
                         )
                     }
                     if (plan.isEmpty()) continue
-                    return HiddenPair(
+                    HiddenPair(
                         keyCells = keys,
                         unitCells = unit.cells.toSet(),
                         plan = plan,
                         pairDigits = pair,
-                    )
+                    ).let { if (emit(it)) return it }
                 }
             }
         }
         return null
     }
 
-    internal fun findPointingPair(grid: IntArray, cands: Array<Set<Int>>): PointingPair? {
+    internal fun findPointingPair(grid: IntArray, cands: Array<Set<Int>>): PointingPair? =
+        scanPointingPair(grid, cands) { true }
+
+    internal fun allPointingPair(grid: IntArray, cands: Array<Set<Int>>): List<PointingPair> =
+        buildList { scanPointingPair(grid, cands) { add(it); false } }
+
+    /** Calls [emit] on each instance in search order; stops once it returns true. */
+    private fun scanPointingPair(
+        grid: IntArray,
+        cands: Array<Set<Int>>,
+        emit: (PointingPair) -> Boolean,
+    ): PointingPair? {
         for (boxIdx in 0 until 9) {
             val box = UNITS_ORDERED[boxIdx]
             for (d in 1..9) {
@@ -515,12 +589,12 @@ object HintEngine {
                             plan += EliminationStep(idx, setOf(d), cells.toSet())
                         }
                     }
-                    if (plan.isNotEmpty()) return PointingPair(
+                    if (plan.isNotEmpty()) PointingPair(
                         keyCells = cells.toSet(),
                         unitCells = box.cells.toSet(),
                         plan = plan,
                         digit = d,
-                    )
+                    ).let { if (emit(it)) return it }
                 }
                 if (cols.size == 1) {
                     val col = cols.first()
@@ -532,19 +606,30 @@ object HintEngine {
                             plan += EliminationStep(idx, setOf(d), cells.toSet())
                         }
                     }
-                    if (plan.isNotEmpty()) return PointingPair(
+                    if (plan.isNotEmpty()) PointingPair(
                         keyCells = cells.toSet(),
                         unitCells = box.cells.toSet(),
                         plan = plan,
                         digit = d,
-                    )
+                    ).let { if (emit(it)) return it }
                 }
             }
         }
         return null
     }
 
-    internal fun findBoxLineReduction(grid: IntArray, cands: Array<Set<Int>>): BoxLineReduction? {
+    internal fun findBoxLineReduction(grid: IntArray, cands: Array<Set<Int>>): BoxLineReduction? =
+        scanBoxLineReduction(grid, cands) { true }
+
+    internal fun allBoxLineReduction(grid: IntArray, cands: Array<Set<Int>>): List<BoxLineReduction> =
+        buildList { scanBoxLineReduction(grid, cands) { add(it); false } }
+
+    /** Calls [emit] on each instance in search order; stops once it returns true. */
+    private fun scanBoxLineReduction(
+        grid: IntArray,
+        cands: Array<Set<Int>>,
+        emit: (BoxLineReduction) -> Boolean,
+    ): BoxLineReduction? {
         for (d in 1..9) {
             for (r in 0 until 9) {
                 val rowCells = (0 until 9).map { r * 9 + it }
@@ -561,12 +646,12 @@ object HintEngine {
                         plan += EliminationStep(idx, setOf(d), cells.toSet())
                     }
                 }
-                if (plan.isNotEmpty()) return BoxLineReduction(
+                if (plan.isNotEmpty()) BoxLineReduction(
                     keyCells = cells.toSet(),
                     unitCells = rowCells.toSet(),
                     plan = plan,
                     digit = d,
-                )
+                ).let { if (emit(it)) return it }
             }
             for (c in 0 until 9) {
                 val colCells = (0 until 9).map { it * 9 + c }
@@ -583,18 +668,29 @@ object HintEngine {
                         plan += EliminationStep(idx, setOf(d), cells.toSet())
                     }
                 }
-                if (plan.isNotEmpty()) return BoxLineReduction(
+                if (plan.isNotEmpty()) BoxLineReduction(
                     keyCells = cells.toSet(),
                     unitCells = colCells.toSet(),
                     plan = plan,
                     digit = d,
-                )
+                ).let { if (emit(it)) return it }
             }
         }
         return null
     }
 
-    internal fun findNakedTriple(grid: IntArray, cands: Array<Set<Int>>): NakedTriple? {
+    internal fun findNakedTriple(grid: IntArray, cands: Array<Set<Int>>): NakedTriple? =
+        scanNakedTriple(grid, cands) { true }
+
+    internal fun allNakedTriple(grid: IntArray, cands: Array<Set<Int>>): List<NakedTriple> =
+        buildList { scanNakedTriple(grid, cands) { add(it); false } }
+
+    /** Calls [emit] on each instance in search order; stops once it returns true. */
+    private fun scanNakedTriple(
+        grid: IntArray,
+        cands: Array<Set<Int>>,
+        emit: (NakedTriple) -> Boolean,
+    ): NakedTriple? {
         for (unit in UNITS_ORDERED) {
             val candidates = unit.cells.filter { grid[it] == 0 && cands[it].size in 2..3 }
             if (candidates.size < 3) continue
@@ -612,12 +708,12 @@ object HintEngine {
                             plan += EliminationStep(cell, doomed, setOf(a, b, c))
                         }
                         if (plan.isEmpty()) continue
-                        return NakedTriple(
+                        NakedTriple(
                             keyCells = setOf(a, b, c),
                             unitCells = unit.cells.toSet(),
                             plan = plan,
                             tripleDigits = union,
-                        )
+                        ).let { if (emit(it)) return it }
                     }
                 }
             }
@@ -625,7 +721,18 @@ object HintEngine {
         return null
     }
 
-    internal fun findHiddenTriple(grid: IntArray, cands: Array<Set<Int>>): HiddenTriple? {
+    internal fun findHiddenTriple(grid: IntArray, cands: Array<Set<Int>>): HiddenTriple? =
+        scanHiddenTriple(grid, cands) { true }
+
+    internal fun allHiddenTriple(grid: IntArray, cands: Array<Set<Int>>): List<HiddenTriple> =
+        buildList { scanHiddenTriple(grid, cands) { add(it); false } }
+
+    /** Calls [emit] on each instance in search order; stops once it returns true. */
+    private fun scanHiddenTriple(
+        grid: IntArray,
+        cands: Array<Set<Int>>,
+        emit: (HiddenTriple) -> Boolean,
+    ): HiddenTriple? {
         for (unit in UNITS_ORDERED) {
             val digitCells: Map<Int, List<Int>> = (1..9).associateWith { d ->
                 unit.cells.filter { grid[it] == 0 && d in cands[it] }
@@ -650,12 +757,12 @@ object HintEngine {
                             plan += EliminationStep(cell, doomed, others)
                         }
                         if (plan.isEmpty()) continue
-                        return HiddenTriple(
+                        HiddenTriple(
                             keyCells = keys,
                             unitCells = unit.cells.toSet(),
                             plan = plan,
                             tripleDigits = triple,
-                        )
+                        ).let { if (emit(it)) return it }
                     }
                 }
             }
@@ -663,7 +770,18 @@ object HintEngine {
         return null
     }
 
-    internal fun findXWing(grid: IntArray, cands: Array<Set<Int>>): XWing? {
+    internal fun findXWing(grid: IntArray, cands: Array<Set<Int>>): XWing? =
+        scanXWing(grid, cands) { true }
+
+    internal fun allXWing(grid: IntArray, cands: Array<Set<Int>>): List<XWing> =
+        buildList { scanXWing(grid, cands) { add(it); false } }
+
+    /** Calls [emit] on each instance in search order; stops once it returns true. */
+    private fun scanXWing(
+        grid: IntArray,
+        cands: Array<Set<Int>>,
+        emit: (XWing) -> Boolean,
+    ): XWing? {
         for (d in 1..9) {
             // Row-based: two rows where d's candidates lie in exactly the same two columns.
             val rowPos = Array(9) { r ->
@@ -685,13 +803,13 @@ object HintEngine {
                             }
                         }
                     }
-                    if (plan.isNotEmpty()) return XWing(
+                    if (plan.isNotEmpty()) XWing(
                         keyCells = corners,
                         unitCells = ((0 until 9).map { r1 * 9 + it } +
                             (0 until 9).map { r2 * 9 + it }).toSet(),
                         plan = plan,
                         digit = d,
-                    )
+                    ).let { if (emit(it)) return it }
                 }
             }
             // Column-based.
@@ -714,20 +832,31 @@ object HintEngine {
                             }
                         }
                     }
-                    if (plan.isNotEmpty()) return XWing(
+                    if (plan.isNotEmpty()) XWing(
                         keyCells = corners,
                         unitCells = ((0 until 9).map { it * 9 + c1 } +
                             (0 until 9).map { it * 9 + c2 }).toSet(),
                         plan = plan,
                         digit = d,
-                    )
+                    ).let { if (emit(it)) return it }
                 }
             }
         }
         return null
     }
 
-    internal fun findEmptyRectangle(grid: IntArray, cands: Array<Set<Int>>): EmptyRectangle? {
+    internal fun findEmptyRectangle(grid: IntArray, cands: Array<Set<Int>>): EmptyRectangle? =
+        scanEmptyRectangle(grid, cands) { true }
+
+    internal fun allEmptyRectangle(grid: IntArray, cands: Array<Set<Int>>): List<EmptyRectangle> =
+        buildList { scanEmptyRectangle(grid, cands) { add(it); false } }
+
+    /** Calls [emit] on each instance in search order; stops once it returns true. */
+    private fun scanEmptyRectangle(
+        grid: IntArray,
+        cands: Array<Set<Int>>,
+        emit: (EmptyRectangle) -> Boolean,
+    ): EmptyRectangle? {
         for (d in 1..9) {
             for (boxIdx in 0 until 9) {
                 val boxRow0 = (boxIdx / 3) * 3
@@ -768,7 +897,7 @@ object HintEngine {
                             if (grid[elim] != 0 || d !in cands[elim]) continue
 
                             val conj = setOf(R * 9 + c, freeRow * 9 + c)
-                            return EmptyRectangle(
+                            EmptyRectangle(
                                 keyCells = cellsWithD.toSet() + conj,
                                 unitCells = boxCells.toSet() + (0..8).map { it * 9 + c }.toSet(),
                                 plan = listOf(EliminationStep(
@@ -777,7 +906,7 @@ object HintEngine {
                                     explainerCells = cellsWithD.toSet() + conj,
                                 )),
                                 digit = d,
-                            )
+                            ).let { if (emit(it)) return it }
                         }
                         // Type B: strong link is a row r outside the box.
                         for (r in 0..8) {
@@ -793,7 +922,7 @@ object HintEngine {
                             if (grid[elim] != 0 || d !in cands[elim]) continue
 
                             val conj = setOf(r * 9 + C, r * 9 + freeCol)
-                            return EmptyRectangle(
+                            EmptyRectangle(
                                 keyCells = cellsWithD.toSet() + conj,
                                 unitCells = boxCells.toSet() + (0..8).map { r * 9 + it }.toSet(),
                                 plan = listOf(EliminationStep(
@@ -802,7 +931,7 @@ object HintEngine {
                                     explainerCells = cellsWithD.toSet() + conj,
                                 )),
                                 digit = d,
-                            )
+                            ).let { if (emit(it)) return it }
                         }
                     }
                 }
@@ -811,7 +940,18 @@ object HintEngine {
         return null
     }
 
-    internal fun findSwordfish(grid: IntArray, cands: Array<Set<Int>>): Swordfish? {
+    internal fun findSwordfish(grid: IntArray, cands: Array<Set<Int>>): Swordfish? =
+        scanSwordfish(grid, cands) { true }
+
+    internal fun allSwordfish(grid: IntArray, cands: Array<Set<Int>>): List<Swordfish> =
+        buildList { scanSwordfish(grid, cands) { add(it); false } }
+
+    /** Calls [emit] on each instance in search order; stops once it returns true. */
+    private fun scanSwordfish(
+        grid: IntArray,
+        cands: Array<Set<Int>>,
+        emit: (Swordfish) -> Boolean,
+    ): Swordfish? {
         for (d in 1..9) {
             val rowPos = Array(9) { r ->
                 (0 until 9).filter { c -> grid[r * 9 + c] == 0 && d in cands[r * 9 + c] }
@@ -839,12 +979,12 @@ object HintEngine {
                                 }
                             }
                         }
-                        if (plan.isNotEmpty()) return Swordfish(
+                        if (plan.isNotEmpty()) Swordfish(
                             keyCells = keys,
                             unitCells = rs.flatMap { r -> (0 until 9).map { r * 9 + it } }.toSet(),
                             plan = plan,
                             digit = d,
-                        )
+                        ).let { if (emit(it)) return it }
                     }
             }
             val colPos = Array(9) { c ->
@@ -873,19 +1013,30 @@ object HintEngine {
                                 }
                             }
                         }
-                        if (plan.isNotEmpty()) return Swordfish(
+                        if (plan.isNotEmpty()) Swordfish(
                             keyCells = keys,
                             unitCells = cs.flatMap { c -> (0 until 9).map { it * 9 + c } }.toSet(),
                             plan = plan,
                             digit = d,
-                        )
+                        ).let { if (emit(it)) return it }
                     }
             }
         }
         return null
     }
 
-    internal fun findXYWing(grid: IntArray, cands: Array<Set<Int>>): XYWing? {
+    internal fun findXYWing(grid: IntArray, cands: Array<Set<Int>>): XYWing? =
+        scanXYWing(grid, cands) { true }
+
+    internal fun allXYWing(grid: IntArray, cands: Array<Set<Int>>): List<XYWing> =
+        buildList { scanXYWing(grid, cands) { add(it); false } }
+
+    /** Calls [emit] on each instance in search order; stops once it returns true. */
+    private fun scanXYWing(
+        grid: IntArray,
+        cands: Array<Set<Int>>,
+        emit: (XYWing) -> Boolean,
+    ): XYWing? {
         for (pivot in 0 until 81) {
             if (grid[pivot] != 0 || cands[pivot].size != 2) continue
             val pc = cands[pivot].toList()
@@ -912,12 +1063,12 @@ object HintEngine {
                         if (shared !in cands[cell]) continue
                         plan += EliminationStep(cell, setOf(shared), setOf(pa, pb))
                     }
-                    if (plan.isNotEmpty()) return XYWing(
+                    if (plan.isNotEmpty()) XYWing(
                         keyCells = setOf(pivot, pa, pb),
                         unitCells = emptySet(),
                         plan = plan,
                         sharedDigit = shared,
-                    )
+                    ).let { if (emit(it)) return it }
                 }
             }
         }

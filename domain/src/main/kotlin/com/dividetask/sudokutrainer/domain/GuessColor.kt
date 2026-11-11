@@ -1,5 +1,7 @@
 package com.dividetask.sudokutrainer.domain
 
+import kotlinx.serialization.Serializable
+
 /**
  * Colors the player can use. [Blue] is special: it represents a confident
  * "solve" entry, and placing a Blue value auto-clears Blue pencil marks
@@ -26,8 +28,9 @@ enum class GuessColor {
     }
 }
 
+@Serializable
 sealed interface CellColor {
-    data object Given : CellColor
-    data object Solve : CellColor
-    data class Guess(val color: GuessColor) : CellColor
+    @Serializable data object Given : CellColor
+    @Serializable data object Solve : CellColor
+    @Serializable data class Guess(val color: GuessColor) : CellColor
 }

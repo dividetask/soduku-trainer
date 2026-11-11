@@ -1,42 +1,40 @@
 # Screens
 
-The application has two screens in v1: the **Main Menu** and the **Game
-Screen**. This document specifies the contents and layout of each.
+The application has these screens: **Settings**, the **Main Menu**, the
+**Game Screen**, and the **Trainer** (a method list plus a drill
+screen). Settings and the Trainer are specified in
+[`settings-and-trainer.md`](settings-and-trainer.md); this document
+covers the Main Menu and Game Screen.
+
+On the very first launch the app opens on Settings; its **Done** button
+leads to the Main Menu. Every later launch opens on the Main Menu.
 
 ## 1. Main Menu
 
-The landing screen. Its sole purpose is to let the player start a new game
-at a chosen difficulty.
+The landing screen.
 
-### Controls
+### Controls, top to bottom
 
-- **New Game: Easy** — Starts a new game at Easy difficulty.
-- **New Game: Medium** — Starts a new game at Medium difficulty.
-- **New Game: Hard** — Starts a new game at Hard difficulty.
-
-In v1 all three buttons generate a puzzle at the same underlying
-difficulty. They remain on the screen as distinct buttons so the UI is
-stable across versions; later versions will tune the generator per
-button. See [`roadmap.md`](roadmap.md).
+- **Trainer** — Opens the Trainer's method list.
+- **Resume** — Shown only when an unfinished game is saved; continues
+  the most recent game exactly where it was left, undo history included.
+- **1. Beginner … 9. Extreme** — Starts a new game at that difficulty.
+  Starting a new game replaces any saved game.
+- **Settings** — Opens Settings; Done returns here.
 
 ### Layout (suggested)
 
 ```
 +-------------------------------+
-|                               |
 |         Sudoku Trainer        |
-|                               |
-|          [   Easy   ]         |
-|          [  Medium  ]         |
-|          [   Hard   ]         |
-|                               |
+|          [ Trainer  ]         |
+|          [  Resume  ]         |
+|          [1. Beginner]        |
+|              ...              |
+|          [9. Extreme ]        |
+|          [ Settings ]         |
 +-------------------------------+
 ```
-
-### Transitions
-
-- Pressing any difficulty button generates a new puzzle and transitions
-  to the Game Screen.
 
 ## 2. Game Screen
 
@@ -46,10 +44,19 @@ Hosts the playable puzzle and all interactive controls.
 
 The Game Screen is composed of the following regions, from top to bottom:
 
-1. **Board** — The 9x9 Sudoku grid.
-2. **Mode & Color row** — The Pencil toggle and the 8-color picker.
-3. **Digit row** — Nine buttons, one for each digit 1–9.
-4. **Action row** — Undo, Hint, and Give Up / Solve.
+1. **Top bar** — A **Main menu** button, which saves the game for Resume
+   and returns to the Main Menu, and the name of the hint being shown.
+   The system back button does the same as Main menu.
+2. **Board** — The 9x9 Sudoku grid.
+3. **Mode & Color row** — The Pencil toggle and the color picker.
+4. **Digit row** — Nine buttons, one for each digit 1–9.
+5. **Action buttons** — Two columns: Undo / Hint, then Show Again / Clear.
+
+There is no Sweep button: with the *Autofill starting candidates*
+setting on, each game starts as if Sweep were pressed. There is no Give
+Up or Solve button either: leave with Main menu, and the game finishes
+itself once only a few correct cells remain (`solve_criteria` in
+`config.yaml`).
 
 ### Controls
 
@@ -123,35 +130,22 @@ the puzzle's starting position. See
 Reserved for future versions. In v1 the button is present in the UI but
 has no effect (or is disabled). See [`roadmap.md`](roadmap.md).
 
-#### Give Up / Solve
-
-A single button whose label changes based on board state:
-
-- **Give Up** (default label) — Ends the current puzzle immediately
-  and returns to the Main Menu. The solution is **not** shown.
-- **Solve** — Replaces the "Give Up" label once the puzzle is **mostly
-  solved**. Pressing it fills in every remaining empty cell with the
-  correct solution value (in a distinct "solve" color), waits **five
-  seconds** on the completed board, then returns to the Main Menu.
-
-"Mostly solved" requires both (a) at least 70 of 81 cells match the
-solution and (b) no cell holds an incorrect value. The exact rules are
-in [`game-mechanics.md`](game-mechanics.md).
-
 ### Layout (suggested)
 
 ```
 +-----------------------------------------------+
+|  [Main menu]        Hint name                 |
 |  +-----------------------------------------+  |
 |  |                                         |  |
 |  |            9 x 9  BOARD                 |  |
 |  |                                         |  |
 |  +-----------------------------------------+  |
 |                                               |
-|  [Pencil]   [c1][c2][c3][c4][c5][c6][c7][c8] |
+|  [Pencil] [Solve] [c1][c2][c3][c4][c5]       |
 |                                               |
 |  [1][2][3][4][5][6][7][8][9]                  |
 |                                               |
-|  [Undo]   [Hint]   [Give Up / Solve]          |
+|  [   Undo    ]   [    Hint    ]               |
+|  [ Show Again]   [   Clear    ]               |
 +-----------------------------------------------+
 ```

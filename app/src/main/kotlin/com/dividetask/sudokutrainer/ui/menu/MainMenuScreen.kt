@@ -10,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,9 +23,11 @@ import com.dividetask.sudokutrainer.domain.Difficulty
 
 @Composable
 fun MainMenuScreen(
-    showTestButton: Boolean,
+    canResume: Boolean,
+    onTrainer: () -> Unit,
+    onResume: () -> Unit,
     onStartGame: (Difficulty) -> Unit,
-    onStartTest: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     Scaffold { inner ->
         Column(
@@ -42,6 +45,22 @@ fun MainMenuScreen(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(bottom = 16.dp),
             )
+            Button(
+                onClick = onTrainer,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6A1B9A)),
+            ) {
+                Text("Trainer", style = MaterialTheme.typography.titleMedium)
+            }
+            if (canResume) {
+                Button(
+                    onClick = onResume,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                ) {
+                    Text("Resume", style = MaterialTheme.typography.titleMedium)
+                }
+            }
             Difficulty.entries.forEach { difficulty ->
                 Button(
                     onClick = { onStartGame(difficulty) },
@@ -53,19 +72,11 @@ fun MainMenuScreen(
                     )
                 }
             }
-            if (showTestButton) {
-                Button(
-                    onClick = onStartTest,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF6A1B9A),
-                    ),
-                ) {
-                    Text(
-                        text = "Test",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                }
+            OutlinedButton(
+                onClick = onSettings,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Settings", style = MaterialTheme.typography.titleMedium)
             }
         }
     }

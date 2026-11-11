@@ -5,6 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.dividetask.sudokutrainer.data.GameConfig
 import com.dividetask.sudokutrainer.data.PuzzleRepository
+import com.dividetask.sudokutrainer.data.SavedGameStore
+import com.dividetask.sudokutrainer.data.SettingsStore
 import com.dividetask.sudokutrainer.ui.SudokuTrainerApp
 import com.dividetask.sudokutrainer.ui.theme.SudokuTrainerTheme
 
@@ -13,9 +15,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val repository = PuzzleRepository(applicationContext)
         val config = GameConfig.loadFromAssets(applicationContext)
+        val settingsStore = SettingsStore(applicationContext)
+        val savedGames = SavedGameStore(applicationContext)
         setContent {
             SudokuTrainerTheme {
-                SudokuTrainerApp(repository, config)
+                SudokuTrainerApp(repository, config, settingsStore, savedGames)
             }
         }
     }

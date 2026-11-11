@@ -1,5 +1,7 @@
 package com.dividetask.sudokutrainer.domain
 
+import kotlinx.serialization.Serializable
+
 /**
  * One cell on the 9x9 board.
  *
@@ -13,6 +15,7 @@ package com.dividetask.sudokutrainer.domain
  *   but they are retained in data when a value is set so that clearing the
  *   value reveals them again.
  */
+@Serializable
 data class Cell(
     val row: Int,
     val col: Int,

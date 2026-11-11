@@ -42,8 +42,3 @@ pending_hint_ms: 10000
 #                        the last hint compared to the normal animation
 #                        pace. 3.0 = three times as slow.
 show_again_multiplier: 3.0
-
-# show_test_button: When true, the main menu shows a "Test" button below
-#                   Extreme that walks through each hint technique's
-#                   teaching animation on a pre-built example puzzle.
-show_test_button: true

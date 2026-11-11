@@ -80,6 +80,35 @@ class HintAnimator(
         setState(complete(getState(), h, count))
     }
 
+    /**
+     * Apply [hint]'s end result straight away, with no animation — for
+     * when the player has turned off "show work when giving hint". No-op
+     * while an animation is running.
+     */
+    fun applyInstantly(hint: HintEngine.Hint, countAsHint: Boolean = true) {
+        if (pending != null) return
+        val s = getState()
+        // The completion steps read the snapshot their begin step takes
+        // (for undo), so begin first, then finish in the same frame.
+        val begun = when (hint) {
+            is HintEngine.NakedSingle -> GameReducer.beginNakedSingleHint(s, hint)
+            is HintEngine.HiddenSingle -> GameReducer.beginHiddenSingleHint(s, hint)
+            is HintEngine.NoteSingle -> GameReducer.beginNoteSingleHint(s, hint)
+            is HintEngine.CandidateSweep -> GameReducer.beginCandidateSweep(s, hint)
+            is HintEngine.EliminationHint -> GameReducer.beginEliminationHint(s, hint)
+        }
+        setState(complete(begun, hint, countAsHint))
+    }
+
+    /** [launch] when [showWork] is set, otherwise [applyInstantly]. Returns the animation's job, if any. */
+    fun run(hint: HintEngine.Hint, showWork: Boolean, countAsHint: Boolean = true): Job? =
+        if (showWork) {
+            launch(hint, countAsHint)
+        } else {
+            applyInstantly(hint, countAsHint)
+            null
+        }
+
     private fun stepMs(): Long =
         (stepDelayMs() * pendingSpeedMultiplier).toLong().coerceAtLeast(1)
 
@@ -119,7 +148,7 @@ class HintAnimator(
                     explainerCells = step.explainerCells,
                 )
             }
-            GameReducer.completeEliminationHint(s, hint)
+            GameReducer.completeEliminationHint(s, hint, countAsHint = countAsHint)
         }
     }
 

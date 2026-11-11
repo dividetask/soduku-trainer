@@ -196,8 +196,9 @@ so the player can undo all the way back to the puzzle's starting
 position. Once the board is at the starting position, further undo
 presses have no effect.
 
-The Solve and Give Up actions end the game and clear the undo history —
-see below.
+Auto-solve ends the game and clears the undo history — see below. The
+Candidate Sweep that opens a game (with *Autofill starting candidates*
+on) is part of the starting position, so it can't be undone.
 
 ## Hint
 
@@ -205,50 +206,18 @@ Not implemented in v1. The button is present in the UI but takes no
 action (or is disabled/greyed-out). The intent for later versions is
 described in [`roadmap.md`](roadmap.md).
 
-## Give Up / Solve
+## Finishing and leaving a game
 
-A single button with two labels.
+- **Auto-solve.** Once at most `solve_criteria` cells (see
+  `config.yaml`) are empty and every filled cell is correct, the game
+  fills in the rest in the Solve color, celebrates, and returns to the
+  Main Menu. The saved game is discarded.
+- **Main menu / back.** Saves the game — board, notes and undo history
+  — and returns to the Main Menu, whose **Resume** button continues it.
+  Only the most recent unfinished game is kept.
+- **Clear.** Resets the board to its givens (and re-runs the opening
+  sweep when autofill is on).
 
-### Label rule
-
-- The button shows **Give Up** by default.
-- It shows **Solve** once the puzzle is **mostly solved**, defined in
-  v1 as **both** of:
-  1. At least **70 of the 81** cells hold the correct solution value
-     (counting givens, which are always correct). "Correct" means the
-     cell's current value equals the puzzle's known solution for that
-     cell.
-  2. **Every** non-empty cell holds the correct solution value — that
-     is, no cell has an incorrect value. Empty cells are allowed; a
-     single incorrect cell prevents the Solve label from appearing.
-
-If the player later changes the board in a way that violates either
-condition (e.g. introduces an incorrect digit, or clears enough cells
-to drop below 70 correct), the button reverts to **Give Up**.
-
-The threshold (70) is tunable in later versions — see
-[`roadmap.md`](roadmap.md).
-
-### Give Up behavior
-
-Pressing **Give Up**:
-
-1. Ends the game immediately. The solution is **not** revealed.
-2. Returns to the Main Menu.
-3. The current game's state is discarded; there is no resume.
-
-### Solve behavior
-
-Pressing **Solve**:
-
-1. Fills every remaining empty cell with its correct solution value.
-   Filled cells are already correct (guaranteed by the label rule), so
-   no existing value is changed.
-2. The cells filled in by Solve are drawn in a **distinct color**
-   reserved for this action (not any of the 8 guess colors and not
-   black), so the player can see at a glance which cells the computer
-   completed.
-3. After a **5-second delay** (during which the completed board is
-   visible), the game returns to the Main Menu.
-4. The game state is discarded on return; undo is not available during
-   the delay.
+The settings that change how moves are accepted (*Prevent incorrect
+cell values* / *notes*) are described in
+[`settings-and-trainer.md`](settings-and-trainer.md).

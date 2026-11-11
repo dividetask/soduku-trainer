@@ -107,9 +107,11 @@ All design documents live under [`docs/`](docs/):
 - [`docs/design-overview.md`](docs/design-overview.md) — High-level
   product overview, goals, and architectural outline.
 - [`docs/screens.md`](docs/screens.md) — Main Menu and Game Screen specs.
+- [`docs/settings-and-trainer.md`](docs/settings-and-trainer.md) —
+  Settings, Resume, and the Trainer.
 - [`docs/game-mechanics.md`](docs/game-mechanics.md) — Per-control
   behavior: number selection, pencil mode, color picker, undo, hint,
-  give up / solve.
+  finishing and leaving a game.
 - [`docs/data-model.md`](docs/data-model.md) — `GameState`, `Cell`,
   `Move` variants, and derived state.
 - [`docs/roadmap.md`](docs/roadmap.md) — v1 scope and future versions.

@@ -51,6 +51,9 @@ class PuzzleRepository(private val context: Context) {
         return PuzzleTransformer.transform(base, random)
     }
 
+    /** [pickRandom] by difficulty level (1–9), for the trainer. */
+    fun pickRandom(level: Int): Puzzle = pickRandom(Difficulty.fromLevel(level))
+
     companion object {
         private const val ASSET_PATH = "puzzles/v3.json"
     }

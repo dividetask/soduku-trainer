@@ -1,6 +1,9 @@
 package com.dividetask.sudokutrainer.domain
 
+import kotlinx.serialization.Serializable
+
 /** A pencil mark added or cleared on a specific cell — used by undo. */
+@Serializable
 data class AutoClearedMark(
     val row: Int,
     val col: Int,
@@ -8,8 +11,10 @@ data class AutoClearedMark(
     val color: GuessColor,
 )
 
+@Serializable
 sealed interface Move {
 
+    @Serializable
     data class SetValue(
         val row: Int,
         val col: Int,
@@ -21,6 +26,7 @@ sealed interface Move {
         init { require(newValue in 1..9) }
     }
 
+    @Serializable
     data class ClearValue(
         val row: Int,
         val col: Int,
@@ -30,6 +36,7 @@ sealed interface Move {
         init { require(prevValue in 1..9) }
     }
 
+    @Serializable
     data class TogglePencilMark(
         val row: Int,
         val col: Int,
@@ -45,6 +52,7 @@ sealed interface Move {
      * marks atomically. [addedMarks] are removed on undo; [removedMarks]
      * are restored.
      */
+    @Serializable
     data class PencilSweep(
         val addedMarks: List<AutoClearedMark>,
         val removedMarks: List<AutoClearedMark>,

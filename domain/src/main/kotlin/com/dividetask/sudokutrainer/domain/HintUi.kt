@@ -13,6 +13,13 @@ sealed interface HintUi {
     data object NoHintFlash : HintUi
 
     /**
+     * Brief red flash after a move was rejected (an incorrect entry the
+     * settings forbid, or a trainer move the method doesn't make). The
+     * Board paints the background red, the same as [NoHintFlash].
+     */
+    data object ErrorFlash : HintUi
+
+    /**
      * Naked-single teaching animation in progress.
      *
      * - [targetCell] is shaded green for the duration.
