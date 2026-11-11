@@ -18,6 +18,7 @@ import com.dividetask.sudokutrainer.domain.TrainerJudge
 import com.dividetask.sudokutrainer.domain.TrainerMethod
 import com.dividetask.sudokutrainer.ui.game.HintAnimator
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,7 +48,13 @@ class TrainerViewModel(
     /** The board, or null while the first drill is being found. */
     val state: StateFlow<GameState?> = _state.asStateFlow()
 
+    private val _solvedByHint = MutableStateFlow(false)
+
+    /** True while a drill the hint finished waits to be replaced; Show Again replays it. */
+    val solvedByHint: StateFlow<Boolean> = _solvedByHint.asStateFlow()
+
     private var drill: TrainerDrill? = null
+    private var advanceJob: Job? = null
 
     private val animator = HintAnimator(
         scope = viewModelScope,
@@ -66,12 +73,18 @@ class TrainerViewModel(
                 val d = drill ?: return@collect
                 if (s == null || s.phase != GameState.Phase.Playing) return@collect
                 if (_status.value != Status.Playing) return@collect
-                if (TrainerJudge.judge(d, s) == TrainerJudge.Verdict.Complete) onSolved()
+                if (TrainerJudge.judge(d, s) == TrainerJudge.Verdict.Complete) {
+                    // Player moves clear lastHint, so it is only set when
+                    // the hint made the finishing move.
+                    onSolved(byHint = s.lastHint != null)
+                }
             }
         }
     }
 
     fun nextDrill() {
+        advanceJob?.cancel()
+        _solvedByHint.value = false
         _status.value = Status.Loading
         viewModelScope.launch {
             val d = withContext(Dispatchers.Default) {
@@ -104,10 +117,37 @@ class TrainerViewModel(
         return (total - TrainerJudge.remaining(d, state)) to total
     }
 
-    private fun onSolved() {
+    private fun onSolved(byHint: Boolean) {
         _status.value = Status.Solved
-        viewModelScope.launch {
-            delay(SOLVED_PAUSE_MS)
+        _solvedByHint.value = byHint
+        // A hint's answer stays up longer, so there's time for Show Again.
+        scheduleNextDrill(if (byHint) HINT_SOLVED_PAUSE_MS else SOLVED_PAUSE_MS)
+    }
+
+    private fun scheduleNextDrill(delayMs: Long) {
+        advanceJob?.cancel()
+        advanceJob = viewModelScope.launch {
+            delay(delayMs)
+            nextDrill()
+        }
+    }
+
+    /**
+     * Replay the hint that finished the drill, slowed down as in a game,
+     * then wait the full pause again before the next drill.
+     */
+    fun onShowAgain() {
+        val s = _state.value ?: return
+        if (_status.value != Status.Solved || !_solvedByHint.value || animator.isRunning) return
+        val hint = s.lastHint ?: return
+        advanceJob?.cancel()
+        // Take the hint's move back off the board so the animation can
+        // make it again.
+        _state.value = GameReducer.undo(s).copy(lastHint = hint)
+        val job = animator.launch(hint, countAsHint = false, speedMultiplier = config.showAgainMultiplier)
+        advanceJob = viewModelScope.launch {
+            job?.join()
+            delay(HINT_SOLVED_PAUSE_MS)
             nextDrill()
         }
     }
@@ -173,6 +213,7 @@ class TrainerViewModel(
 
     companion object {
         private const val SOLVED_PAUSE_MS = 1_000L
+        private const val HINT_SOLVED_PAUSE_MS = 5_000L
 
         fun factory(
             repository: PuzzleRepository,

@@ -77,6 +77,10 @@ tries another puzzle. The board is shown at that point:
   from both are allowed; the drill completes as soon as one of them is
   fully applied.
 
-On completion the top bar shows "Correct!" and a new drill is dealt.
+On completion the top bar shows "Correct!" and a new drill is dealt
+after a second. When the **hint** made the finishing move, the board
+stays up for five seconds instead and the Undo button becomes **Show
+Again**, which replays that hint slowly; the five seconds restart once
+the replay ends.
 **Hint** first highlights the pattern's cells, then shows (or applies,
 with *Show work* off) the application closest to being finished.
