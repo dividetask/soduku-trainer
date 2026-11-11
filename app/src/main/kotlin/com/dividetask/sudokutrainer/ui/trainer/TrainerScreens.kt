@@ -21,7 +21,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -51,12 +50,6 @@ fun TrainerMenuScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             TopBar(label = "Trainer", onMainMenu = onMainMenu)
-            Text(
-                text = "Pick a method. Each puzzle stops where that method is the easiest next step.",
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
             TrainerMethod.entries.forEach { method ->
                 Button(onClick = { onMethod(method) }, modifier = Modifier.fillMaxWidth()) {
                     Text(method.techniqueName, style = MaterialTheme.typography.titleMedium)
