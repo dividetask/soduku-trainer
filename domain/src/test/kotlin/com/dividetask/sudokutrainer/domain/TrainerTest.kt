@@ -179,6 +179,16 @@ class TrainerTest {
         assertEquals(TrainerJudge.Verdict.InProgress, TrainerJudge.judge(drill, filled))
     }
 
+    @ParameterizedTest
+    @EnumSource(value = TrainerMethod::class, names = ["HiddenSingle", "NakedSingle"], mode = EnumSource.Mode.EXCLUDE)
+    fun `note drills always show their notes, whatever the autofill setting`(method: TrainerMethod) {
+        val drill = drillFor(method)
+        for (fill in listOf(false, true)) {
+            val cells = drill.toGameState(fillCandidates = fill).cells
+            for (i in 0 until 81) assertEquals(drill.marks[i], cells[i].pencilMarks.keys, "cell $i, fill=$fill")
+        }
+    }
+
     @Test
     fun `hidden single is listed before naked single`() {
         assertEquals(TrainerMethod.HiddenSingle, TrainerMethod.entries[0])
