@@ -112,7 +112,7 @@ class TrainerViewModel(
      */
     fun progress(state: GameState): Pair<Int, Int>? {
         val d = drill ?: return null
-        val total = d.placements.size
+        val total = d.targets.size
         if (total < 2) return null
         return (total - TrainerJudge.remaining(d, state)) to total
     }

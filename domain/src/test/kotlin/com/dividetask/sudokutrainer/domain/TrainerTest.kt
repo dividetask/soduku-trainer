@@ -82,31 +82,56 @@ class TrainerTest {
 
     @ParameterizedTest
     @EnumSource(value = TrainerMethod::class, names = ["NakedSingle", "HiddenSingle"])
-    fun `a placement drill needs every single placed`(method: TrainerMethod) {
+    fun `a placement drill runs until the method finds nothing more`(method: TrainerMethod) {
         val drill = drillWithSeveralSingles(method)
-        val start = drill.toGameState()
-        val all = drill.placements.toList()
-        var s = start
-        for ((n, p) in all.withIndex()) {
-            assertEquals(all.size - n, TrainerJudge.remaining(drill, s))
+        assertTrue(drill.targets.containsAll(drill.placements))
+        val total = drill.targets.size
+        var s = drill.toGameState()
+        // Play it out the way a player following hints would.
+        for (n in 0 until total) {
+            assertEquals(total - n, TrainerJudge.remaining(drill, s), "total must not change as singles open up")
             assertEquals(TrainerJudge.Verdict.InProgress, TrainerJudge.judge(drill, s))
+            val h = TrainerJudge.hintFor(drill, s)!!
+            val p = NoteRef(target(h), drill.puzzle.solution[target(h)])
+            assertTrue(p in drill.targets, "hint left the targets")
             s = place(s, p)
+            assertTrue(TrainerJudge.judge(drill, s) != TrainerJudge.Verdict.Wrong)
         }
         assertEquals(0, TrainerJudge.remaining(drill, s))
         assertEquals(TrainerJudge.Verdict.Complete, TrainerJudge.judge(drill, s))
+        // Nothing of this method is left on the board.
+        val grid = IntArray(81) { s.cells[it].value ?: 0 }
+        assertTrue(TrainerGenerator.singlesOf(method, grid).none { grid[it.cell] == 0 })
     }
 
     @ParameterizedTest
     @EnumSource(value = TrainerMethod::class, names = ["NakedSingle", "HiddenSingle"])
-    fun `hint points at a single that is still unplaced`(method: TrainerMethod) {
-        val drill = drillWithSeveralSingles(method)
-        val first = drill.placements.first { p ->
-            target(TrainerJudge.hintFor(drill, drill.toGameState())!!) == p.cell
+    fun `the total counts singles that open up later`(method: TrainerMethod) {
+        val random = Random(method.ordinal + 2000)
+        repeat(200) {
+            val drill = TrainerGenerator.generate(method, { level -> pool.getValue(level).random(random) }, random)
+                ?: return@repeat
+            val later = drill.targets - drill.placements
+            if (later.isEmpty()) return@repeat
+            // Placing a later target before it opens up is not this method yet.
+            val early = place(drill.toGameState(), later.first())
+            assertEquals(TrainerJudge.Verdict.Wrong, TrainerJudge.judge(drill, early))
+            return
         }
-        val after = place(drill.toGameState(), first)
-        val next = TrainerJudge.hintFor(drill, after)!!
-        assertTrue(target(next) != first.cell)
-        assertTrue(drill.placements.any { it.cell == target(next) })
+        error("no $method drill had singles that open up later")
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = TrainerMethod::class, names = ["NakedSingle", "HiddenSingle"])
+    fun `hint points at an unplaced target`(method: TrainerMethod) {
+        val drill = drillWithSeveralSingles(method)
+        var s = drill.toGameState()
+        repeat(3) {
+            val h = TrainerJudge.hintFor(drill, s) ?: return
+            assertEquals(null, s.cells[target(h)].value)
+            assertTrue(drill.targets.any { it.cell == target(h) })
+            s = place(s, NoteRef(target(h), drill.puzzle.solution[target(h)]))
+        }
     }
 
     @Test
@@ -123,7 +148,8 @@ class TrainerTest {
             val fresh = HintEngine.allNakedSingles(grid).firstOrNull() ?: return@repeat
             val p = NoteRef(fresh.targetCell, fresh.solutionDigit)
             assertTrue(p !in drill.placements)
-            assertEquals(TrainerJudge.Verdict.Complete, TrainerJudge.judge(drill, place(s, p)))
+            assertTrue(p in drill.targets)
+            assertTrue(TrainerJudge.judge(drill, place(s, p)) != TrainerJudge.Verdict.Wrong)
             // A correct value that is no naked single is still wrong.
             val other = (0 until 81).first { i ->
                 grid[i] == 0 && i != p.cell && HintEngine.allNakedSingles(grid).none { it.targetCell == i }

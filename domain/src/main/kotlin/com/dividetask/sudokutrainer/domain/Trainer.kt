@@ -101,7 +101,10 @@ data class NoteRef(val cell: Int, val digit: Int)
  *   up to this point) and [marks] its pencil marks (all empty when the
  *   method doesn't use notes).
  * - [placements] (placement methods) are the (cell, digit) placements
- *   the method produces; the drill is complete once all are made.
+ *   the method produces on the starting board. [targets] adds every
+ *   placement it goes on to produce once those are made, repeated until
+ *   it finds nothing new; the drill is complete once all targets are
+ *   placed.
  * - [instances] (note methods) are the distinct applications of the
  *   method on this board, as hints that can be animated. The drill is
  *   complete once every elimination of any one instance is made.
@@ -113,7 +116,7 @@ data class TrainerDrill(
     val marks: List<Set<Int>>,
     val placements: Set<NoteRef>,
     val instances: List<HintEngine.EliminationHint>,
-    val placementHints: List<HintEngine.Hint> = emptyList(),
+    val targets: Set<NoteRef> = placements,
 ) {
     /** The eliminations each instance makes. */
     val instanceEliminations: List<Set<NoteRef>> =
@@ -214,7 +217,9 @@ object TrainerGenerator {
                 // Logic only ever produces correct placements; a mismatch
                 // means a malformed puzzle, so skip it.
                 if (placements.isEmpty() || placements.any { puzzle.solution[it.cell] != it.digit }) return null
-                TrainerDrill(method, puzzle, grid.toList(), markList, placements, emptyList(), hints)
+                val targets = singlesClosure(method, grid)
+                if (!targets.containsAll(placements) || targets.any { puzzle.solution[it.cell] != it.digit }) return null
+                TrainerDrill(method, puzzle, grid.toList(), markList, placements, emptyList(), targets)
             }
             else -> {
                 val instances = HintEngine.allEliminations(
@@ -227,6 +232,29 @@ object TrainerGenerator {
             }
         }
     }
+
+    /**
+     * Every placement [method] (a single) yields from [grid]: place all
+     * the singles it finds, look again, and repeat until it finds none.
+     * Placing a value only removes candidates, so a single stays a
+     * single and this set doesn't depend on the order singles are placed.
+     */
+    internal fun singlesClosure(method: TrainerMethod, grid: IntArray): Set<NoteRef> {
+        val g = grid.copyOf()
+        val out = mutableSetOf<NoteRef>()
+        while (true) {
+            val found = singlesOf(method, g).filter { g[it.cell] == 0 }
+            if (found.isEmpty()) return out
+            for (p in found) { g[p.cell] = p.digit; out += p }
+        }
+    }
+
+    /** The singles [method] finds on [grid], as placements, in hint order. */
+    internal fun singlesOf(method: TrainerMethod, grid: IntArray): List<NoteRef> = when (method) {
+        TrainerMethod.NakedSingle -> HintEngine.allNakedSingles(grid).map { NoteRef(it.targetCell, it.solutionDigit) }
+        TrainerMethod.HiddenSingle -> HintEngine.allHiddenSingles(grid).map { NoteRef(it.targetCell, it.solutionDigit) }
+        else -> emptyList()
+    }.distinct()
 
     /** Apply [hint] to the working board. Returns false if it made no progress. */
     private fun apply(hint: HintEngine.Hint, grid: IntArray, marks: Array<MutableSet<Int>>?): Boolean {
@@ -292,8 +320,8 @@ object TrainerJudge {
      *
      * - Placement drills: every placed value must come from the method —
      *   one of the drill's starting placements, or a single that earlier
-     *   placements created. The drill is complete once every starting
-     *   placement is made.
+     *   placements created. The drill is complete once every target (the
+     *   singles the method reaches, repeated to the end) is placed.
      * - Note drills: no value may be placed, and notes may only be
      *   removed, and only ones that some instance of the method
      *   eliminates. The drill is complete once every elimination of any
@@ -320,9 +348,9 @@ object TrainerJudge {
         else Verdict.InProgress
     }
 
-    /** Starting placements still to make in a placement drill (0 for note drills). */
+    /** Targets still to place in a placement drill (0 for note drills). */
     fun remaining(drill: TrainerDrill, state: GameState): Int =
-        drill.placements.count { state.cells[it.cell].value != it.digit }
+        drill.targets.count { state.cells[it.cell].value != it.digit }
 
     private fun judgePlacements(drill: TrainerDrill, state: GameState): Verdict {
         val grid = IntArray(81) { state.cells[it].value ?: 0 }
@@ -370,13 +398,12 @@ object TrainerJudge {
      */
     fun hintFor(drill: TrainerDrill, state: GameState): HintEngine.Hint? {
         if (drill.instances.isEmpty()) {
-            return drill.placementHints.firstOrNull { h ->
-                val target = when (h) {
-                    is HintEngine.NakedSingle -> h.targetCell
-                    is HintEngine.HiddenSingle -> h.targetCell
-                    else -> return@firstOrNull false
-                }
-                state.cells[target].value == null
+            // Singles open up as the player goes, so look at the board now.
+            val grid = IntArray(81) { state.cells[it].value ?: 0 }
+            return when (drill.method) {
+                TrainerMethod.NakedSingle -> HintEngine.allNakedSingles(grid).firstOrNull()
+                TrainerMethod.HiddenSingle -> HintEngine.allHiddenSingles(grid).firstOrNull()
+                else -> null
             }
         }
         val best = drill.instances.indices.maxBy { k ->

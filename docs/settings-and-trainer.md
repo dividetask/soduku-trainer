@@ -63,11 +63,13 @@ tries another puzzle. The board is shown at that point:
 
 `TrainerJudge` compares the board with the drill's starting position:
 
-- **Placement methods:** every single on the starting board must be
-  placed; the top bar shows progress such as "2/4 solved". A single that the
-  player's own placements open up is accepted too. Any other value —
-  even a correct one found by a different method — flashes red and is
-  undone.
+- **Placement methods:** the drill's total is worked out up front: place
+  every single the method finds, look again, and repeat until it finds
+  no more. That fixed total is shown as progress ("2/9 solved") and the
+  drill completes when all of them are placed, whatever order the player
+  takes. A single may only be placed once it is actually available —
+  a correct value that the method can't reach yet, or that comes from a
+  different method, flashes red and is undone.
 - **Note methods:** the player removes notes. Removing a note that no
   application of the method eliminates, adding a note, or placing a
   value flashes red and is undone. The drill completes once **every**
