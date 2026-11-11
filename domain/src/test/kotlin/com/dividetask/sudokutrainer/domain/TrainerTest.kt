@@ -157,9 +157,32 @@ class TrainerTest {
     }
 
     @Test
-    fun `hidden single drills have no naked single available`() {
-        val drill = drillFor(TrainerMethod.HiddenSingle)
-        assertTrue(HintEngine.allNakedSingles(drill.grid.toIntArray()).isEmpty())
+    fun `naked single drills have no hidden single available`() {
+        val drill = drillFor(TrainerMethod.NakedSingle)
+        assertTrue(HintEngine.allHiddenSingles(drill.grid.toIntArray()).isEmpty())
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = TrainerMethod::class, names = ["HiddenSingle", "NakedSingle"])
+    fun `placement drills show candidates only when asked`(method: TrainerMethod) {
+        val drill = drillFor(method)
+        assertTrue(drill.toGameState().cells.all { it.pencilMarks.isEmpty() })
+        val filled = drill.toGameState(fillCandidates = true)
+        val grid = drill.grid.toIntArray()
+        for (c in filled.cells) {
+            val i = c.row * 9 + c.col
+            val expected = if (grid[i] != 0) emptySet()
+            else (1..9).filter { SudokuSolver.isValidPlacement(grid, c.row, c.col, it) }.toSet()
+            assertEquals(expected, c.pencilMarks.keys, "cell $i")
+        }
+        // Notes don't affect judging a placement drill.
+        assertEquals(TrainerJudge.Verdict.InProgress, TrainerJudge.judge(drill, filled))
+    }
+
+    @Test
+    fun `hidden single is listed before naked single`() {
+        assertEquals(TrainerMethod.HiddenSingle, TrainerMethod.entries[0])
+        assertEquals(TrainerMethod.NakedSingle, TrainerMethod.entries[1])
     }
 
     // ---- Several instances of one method on the same board ----

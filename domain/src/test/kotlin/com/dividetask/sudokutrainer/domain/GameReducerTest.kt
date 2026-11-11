@@ -355,7 +355,7 @@ class GameReducerTest {
     fun `naked single hint flows from begin to complete`() {
         val s0 = initial()
         val grid = IntArray(81) { i -> s0.cells[i].value ?: 0 }
-        val hint = HintEngine.find(grid) as HintEngine.NakedSingle
+        val hint = HintEngine.allNakedSingles(grid).first()
         val tRow = hint.targetCell / 9
         val tCol = hint.targetCell % 9
         // The found cell must match the puzzle's solution at that index.
@@ -452,7 +452,7 @@ class GameReducerTest {
         var s = initial()
         // Seed pencil marks in the cell where the puzzle has a naked single.
         val grid = IntArray(81) { i -> s.cells[i].value ?: 0 }
-        val hint = HintEngine.find(grid) as HintEngine.NakedSingle
+        val hint = HintEngine.allNakedSingles(grid).first()
         val tRow = hint.targetCell / 9
         val tCol = hint.targetCell % 9
         s = GameReducer.togglePencil(s)
@@ -650,7 +650,7 @@ class GameReducerTest {
     fun `pending hint advances from highlight to method, then clears`() {
         val s0 = initial()
         val grid = IntArray(81) { i -> s0.cells[i].value ?: 0 }
-        val hint = HintEngine.find(grid) as HintEngine.NakedSingle
+        val hint = HintEngine.allNakedSingles(grid).first()
 
         var s = GameReducer.setPendingHint(s0, hint, setOf(hint.targetCell))
         assertEquals(setOf(hint.targetCell), s.pendingHint?.keyCells)
@@ -673,7 +673,7 @@ class GameReducerTest {
     fun `placing a value in the pending-hint target clears the hint`() {
         val s0 = initial()
         val grid = IntArray(81) { i -> s0.cells[i].value ?: 0 }
-        val hint = HintEngine.find(grid) as HintEngine.NakedSingle
+        val hint = HintEngine.allNakedSingles(grid).first()
         val tr = hint.targetCell / 9
         val tc = hint.targetCell % 9
 
@@ -693,7 +693,7 @@ class GameReducerTest {
         // double-tap clear — the pending hint must disappear.
         val s0 = initial()
         val grid = IntArray(81) { i -> s0.cells[i].value ?: 0 }
-        val hint = HintEngine.find(grid) as HintEngine.NakedSingle
+        val hint = HintEngine.allNakedSingles(grid).first()
         val emptyIndices = (0 until 81).filter { !s0.cells[it].given && s0.cells[it].value == null }
         val keys = emptyIndices.take(3).toSet()
         check(keys.size == 3)
@@ -729,7 +729,7 @@ class GameReducerTest {
     fun `lastHint is set on completion and survives an undo`() {
         val s0 = initial()
         val grid = IntArray(81) { i -> s0.cells[i].value ?: 0 }
-        val hint = HintEngine.find(grid) as HintEngine.NakedSingle
+        val hint = HintEngine.allNakedSingles(grid).first()
 
         var s = GameReducer.beginNakedSingleHint(s0, hint)
         for (d in 1..9) {
@@ -752,7 +752,7 @@ class GameReducerTest {
     fun `lastHint clears on any player cell change`() {
         val s0 = initial()
         val grid = IntArray(81) { i -> s0.cells[i].value ?: 0 }
-        val hint = HintEngine.find(grid) as HintEngine.NakedSingle
+        val hint = HintEngine.allNakedSingles(grid).first()
 
         var s = GameReducer.beginNakedSingleHint(s0, hint)
         for (d in 1..9) {
@@ -779,7 +779,7 @@ class GameReducerTest {
     fun `completion with countAsHint false leaves hintCount unchanged but sets lastHint`() {
         val s0 = initial()
         val grid = IntArray(81) { i -> s0.cells[i].value ?: 0 }
-        val hint = HintEngine.find(grid) as HintEngine.NakedSingle
+        val hint = HintEngine.allNakedSingles(grid).first()
 
         var s = GameReducer.beginNakedSingleHint(s0, hint)
         for (d in 1..9) {

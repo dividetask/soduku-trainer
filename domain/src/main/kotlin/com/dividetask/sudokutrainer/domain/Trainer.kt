@@ -5,7 +5,8 @@ import kotlin.random.Random
 /**
  * A solving method the trainer can drill. [techniqueName] matches
  * [HintEngine.Hint.techniqueName]. [usesNotes] is false for the two
- * placement methods, which are drilled on a board without notes.
+ * placement methods, whose drills show notes only when the player's
+ * settings ask for them.
  * [minLevel] is the easiest puzzle difficulty worth searching for it.
  */
 enum class TrainerMethod(
@@ -14,16 +15,16 @@ enum class TrainerMethod(
     val minLevel: Int,
     val explanation: String,
 ) {
-    NakedSingle(
-        "Naked Single", usesNotes = false, minLevel = 1,
-        "Every digit but one already appears in the cell's row, column or box. " +
-            "The one digit left must go in that cell.",
-    ),
     HiddenSingle(
         "Hidden Single", usesNotes = false, minLevel = 2,
         "A digit can go in only one cell of a row, column or box, because it " +
             "already appears in a line or box crossing every other cell. Place the " +
             "digit in the one cell left for it.",
+    ),
+    NakedSingle(
+        "Naked Single", usesNotes = false, minLevel = 1,
+        "Every digit but one already appears in the cell's row, column or box. " +
+            "The one digit left must go in that cell.",
     ),
     NakedPair(
         "Naked Pair", usesNotes = true, minLevel = 3,
@@ -118,8 +119,18 @@ data class TrainerDrill(
     val instanceEliminations: List<Set<NoteRef>> =
         instances.map { h -> h.plan.flatMap { s -> s.doomedDigits.map { NoteRef(s.cellIdx, it) } }.toSet() }
 
-    /** The starting [GameState] for this drill. */
-    fun toGameState(): GameState {
+    /**
+     * The starting [GameState] for this drill. Note drills always show
+     * their notes; placement drills show every cell's candidates only
+     * when [fillCandidates] is set (the "autofill starting candidates"
+     * setting).
+     */
+    fun toGameState(fillCandidates: Boolean = false): GameState {
+        val g = grid.toIntArray()
+        val shown = if (method.usesNotes || !fillCandidates) marks else List(81) { i ->
+            if (g[i] != 0) emptySet()
+            else (1..9).filterTo(mutableSetOf()) { SudokuSolver.isValidPlacement(g, i / 9, i % 9, it) }
+        }
         val cells = List(81) { i ->
             val row = i / 9; val col = i % 9
             when {
@@ -128,7 +139,7 @@ data class TrainerDrill(
                 grid[i] != 0 ->
                     Cell(row, col, given = false, value = grid[i], valueColor = CellColor.Solve)
                 else ->
-                    Cell(row, col, given = false, pencilMarks = marks[i].associateWith { GuessColor.DEFAULT })
+                    Cell(row, col, given = false, pencilMarks = shown[i].associateWith { GuessColor.DEFAULT })
             }
         }
         return GameState(puzzle = puzzle, cells = cells)

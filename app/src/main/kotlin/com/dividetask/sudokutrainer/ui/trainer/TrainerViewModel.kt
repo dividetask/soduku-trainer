@@ -84,7 +84,8 @@ class TrainerViewModel(
             drill = d
             // Keep the player's pencil/color choices between drills.
             val prev = _state.value
-            _state.value = d.toGameState().copy(
+            val fill = settingsStore.settings.value.autofillCandidates
+            _state.value = d.toGameState(fillCandidates = fill).copy(
                 pencilOn = prev?.pencilOn ?: d.method.usesNotes,
                 activeColor = prev?.activeColor ?: GuessColor.DEFAULT,
             )

@@ -235,8 +235,10 @@ object HintEngine {
     fun find(grid: IntArray, marks: Array<Set<Int>>? = null): Hint? {
         require(grid.size == 81)
         require(marks == null || marks.size == 81)
-        findNakedSingle(grid)?.let { return it }
+        // Hidden singles come first: they're easier to spot than naked
+        // singles, especially without notes.
         findHiddenSingle(grid)?.let { return it }
+        findNakedSingle(grid)?.let { return it }
         findNoteSingle(grid, marks)?.let { return it }
         findCandidateSweepInternal(grid, marks)?.let { return it }
         val cands = candidateGrid(grid, marks)

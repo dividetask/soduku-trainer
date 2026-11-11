@@ -8,7 +8,7 @@ by default.
 
 | Setting | Effect |
 |---------|--------|
-| **Autofill starting candidates** | A new game (or Clear) starts as if Sweep were pressed: every empty cell gets its candidate notes. The sweep is animated or instant according to *Show work*, and it is part of the starting position (Undo doesn't remove it). Placing a Solve-color value still clears that digit's Solve-color notes from its row, column and box, as before. |
+| **Autofill starting candidates** | Also fills in the notes on Hidden / Naked Single trainer boards. A new game (or Clear) starts as if Sweep were pressed: every empty cell gets its candidate notes. The sweep is animated or instant according to *Show work*, and it is part of the starting position (Undo doesn't remove it). Placing a Solve-color value still clears that digit's Solve-color notes from its row, column and box, as before. |
 | **Show work when giving hint** | When off, a hint's final press applies the result at once instead of playing the animation. The first presses (technique name, then highlighted cells) are unchanged, and Show Again still animates. |
 | **Prevent incorrect cell values** | A value placed in the Solve color that isn't the cell's answer is rejected: the board flashes red and the move is undone. Guess colors may still be wrong. |
 | **Prevent incorrect notes** | A Solve-color note is rejected the same way if it removes the cell's answer from its notes, or adds a digit already placed correctly in the cell's row, column or box *(interpretation)*. Guess-color notes are not checked. |
@@ -28,7 +28,7 @@ saved — leaving mid-animation finishes the hint first.
 ### Method list
 
 One button per solving method, in the order the hint engine tries them:
-Naked Single, Hidden Single, Naked Pair, Hidden Pair, Pointing Pair,
+Hidden Single, Naked Single, Naked Pair, Hidden Pair, Pointing Pair,
 Box-Line Reduction, Naked Triple, Hidden Triple, X-Wing, Empty
 Rectangle, Swordfish, XY-Wing. (Note Single and Candidate Sweep are
 bookkeeping steps, not methods, so they aren't listed.)
@@ -39,6 +39,11 @@ From the top: the Main menu button, the method's name as a header, a
 short explanation of how it works (at most three sentences), the board,
 the pencil/color and digit rows, then Undo and Hint.
 
+Hidden singles are treated as easier than naked singles everywhere the
+hint engine is used: a hint shows a hidden single whenever one exists,
+and a Naked Single drill is a board where no hidden single is left.
+(Puzzle difficulty grading uses `LogicSolver` and is unaffected.)
+
 ### How a drill is built
 
 `TrainerGenerator` picks a puzzle from a difficulty level where the
@@ -47,8 +52,9 @@ easiest technique the hint engine finds, until the selected method is
 the easiest one left. If the puzzle is solved or gets stuck first, it
 tries another puzzle. The board is shown at that point:
 
-- **Naked / Hidden Single** drills are shown **without notes** — finding
-  the single is the exercise.
+- **Hidden / Naked Single** drills show every cell's candidate notes when
+  *Autofill starting candidates* is on, and no notes when it is off.
+  Notes don't affect judging in these drills.
 - Every other method is shown **with all candidate notes** filled in.
 
 ### Judging

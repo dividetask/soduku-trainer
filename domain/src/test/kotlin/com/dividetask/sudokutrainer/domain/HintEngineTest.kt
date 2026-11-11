@@ -21,9 +21,8 @@ class HintEngineTest {
         // Box 0 (rows 0..2, cols 0..2): add 6, 7, 8 in (1,1), (1,2), (2,1)
         grid[1 * 9 + 1] = 6; grid[1 * 9 + 2] = 7; grid[2 * 9 + 1] = 8
 
-        val hint = HintEngine.find(grid)
-        assertNotNull(hint)
-        hint as HintEngine.NakedSingle
+        // (The board also has a hidden single, which find() prefers.)
+        val hint = HintEngine.allNakedSingles(grid).first()
         assertEquals(0, hint.targetCell)
         assertEquals(9, hint.solutionDigit)
         assertEquals("Naked Single", hint.techniqueName)
@@ -123,16 +122,17 @@ class HintEngineTest {
     }
 
     @Test
-    fun `prefers naked single over hidden single when both apply`() {
-        // (0,0) is a naked single (only 9 fits) AND simultaneously a
-        // hidden single for 9 in its row/column/box. Naked should win.
+    fun `prefers hidden single over naked single when both apply`() {
+        // (0,0) is a naked single (only 9 fits), and 4 can only go at
+        // (2,2) in box 0 — a hidden single. Hidden singles come first.
         val grid = IntArray(81)
         grid[1] = 1; grid[2] = 2; grid[3] = 3
         grid[4 * 9 + 0] = 4; grid[5 * 9 + 0] = 5
         grid[1 * 9 + 1] = 6; grid[1 * 9 + 2] = 7; grid[2 * 9 + 1] = 8
 
+        assertTrue(HintEngine.allNakedSingles(grid).isNotEmpty())
         val hint = HintEngine.find(grid)
-        assertTrue(hint is HintEngine.NakedSingle)
+        assertTrue(hint is HintEngine.HiddenSingle, "expected HiddenSingle, got $hint")
     }
 
     @Test
@@ -150,16 +150,34 @@ class HintEngineTest {
     }
 
     @Test
-    fun `Test-menu Naked Single preview grid yields a NakedSingle`() {
+    fun `a single gap in a row is reported as a hidden single`() {
+        // (0,0) is both a naked single and the only spot for 5 in row 0;
+        // with hidden singles tried first, it's reported as one.
         val solution = CANONICAL_SOLUTION
         val givenIndices = intArrayOf(1, 2, 3, 4, 5, 6, 7, 8)
         val grid = IntArray(81)
         for (idx in givenIndices) grid[idx] = solution[idx]
         val hint = HintEngine.find(grid)
+        assertTrue(hint is HintEngine.HiddenSingle, "expected HiddenSingle, got $hint")
+        hint as HintEngine.HiddenSingle
+        assertEquals(0, hint.targetCell)
+        assertEquals(5, hint.solutionDigit)
+    }
+
+    @Test
+    fun `naked single fires when no hidden single applies`() {
+        // Only 9 fits at (0,0), yet 9 still has other spots in its row,
+        // column and box, and no other digit is pinned to one cell.
+        val grid = IntArray(81)
+        grid[1] = 1; grid[2] = 2; grid[3] = 3
+        grid[4 * 9 + 0] = 4; grid[5 * 9 + 0] = 5; grid[6 * 9 + 0] = 6
+        grid[1 * 9 + 1] = 7; grid[1 * 9 + 2] = 8
+        assertTrue(HintEngine.allHiddenSingles(grid).isEmpty(), "board has a hidden single")
+        val hint = HintEngine.find(grid)
         assertTrue(hint is HintEngine.NakedSingle, "expected NakedSingle, got $hint")
         hint as HintEngine.NakedSingle
         assertEquals(0, hint.targetCell)
-        assertEquals(5, hint.solutionDigit)
+        assertEquals(9, hint.solutionDigit)
     }
 
     private val CANONICAL_SOLUTION = intArrayOf(
