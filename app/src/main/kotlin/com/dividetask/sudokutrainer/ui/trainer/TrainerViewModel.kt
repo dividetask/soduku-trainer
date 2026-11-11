@@ -106,16 +106,9 @@ class TrainerViewModel(
         }
     }
 
-    /**
-     * (solved, total) for a placement drill with more than one single to
-     * place; null otherwise.
-     */
-    fun progress(state: GameState): Pair<Int, Int>? {
-        val d = drill ?: return null
-        val total = d.targets.size
-        if (total < 2) return null
-        return (total - TrainerJudge.remaining(d, state)) to total
-    }
+    /** Progress counters for the current drill, or null before one is dealt. */
+    fun progress(state: GameState): TrainerJudge.Progress? =
+        drill?.let { TrainerJudge.progress(it, state) }
 
     private fun onSolved(byHint: Boolean) {
         _status.value = Status.Solved

@@ -65,19 +65,23 @@ tries another puzzle. The board is shown at that point:
 
 - **Placement methods:** the drill's total is worked out up front: place
   every single the method finds, look again, and repeat until it finds
-  no more. That fixed total is shown as progress ("2/9 solved") and the
+  no more. That fixed total is shown as progress ("2/9 Hidden Singles") and the
   drill completes when all of them are placed, whatever order the player
   takes. A single may only be placed once it is actually available —
   a correct value that the method can't reach yet, or that comes from a
   different method, flashes red and is undone.
-- **Note methods:** the player removes notes. Removing a note that no
-  application of the method eliminates, adding a note, or placing a
-  value flashes red and is undone. The drill completes once **every**
-  note of one application has been removed.
-- **Several applications.** When the method applies in more than one
-  place (say two different X-Wings), either may be used, and removals
-  from both are allowed; the drill completes as soon as one of them is
-  fully applied.
+- **Note methods:** the totals are worked out up front the same way:
+  apply the method (the first instance it finds, as a hint would) to the
+  notes over and over until it removes nothing more. The top bar shows
+  both counts, e.g. "3/7 candidates" and "1/2 Pointing Pairs"; an
+  application counts once all its notes are gone. The drill completes
+  when every one of those notes is removed, in any order — two X-Wings
+  both have to be done. Removing any other note, a note only a later
+  application removes before the method can reach it, adding a note, or
+  placing a value flashes red and is undone.
+
+Every drill shows its counter, even when the total is one ("0/1 Naked
+Singles").
 
 On completion the top bar shows "Correct!" and a new drill is dealt
 after a second. When the **hint** made the finishing move, the board
@@ -85,4 +89,4 @@ stays up for five seconds instead and the Undo button becomes **Show
 Again**, which replays that hint slowly; the five seconds restart once
 the replay ends.
 **Hint** first highlights the pattern's cells, then shows (or applies,
-with *Show work* off) the application closest to being finished.
+with *Show work* off) the method's next step on the current board.

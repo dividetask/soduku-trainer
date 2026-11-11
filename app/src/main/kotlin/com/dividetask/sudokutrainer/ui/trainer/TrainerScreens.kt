@@ -26,7 +26,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dividetask.sudokutrainer.domain.GameState
 import com.dividetask.sudokutrainer.domain.HintUi
+import com.dividetask.sudokutrainer.domain.TrainerJudge
 import com.dividetask.sudokutrainer.domain.TrainerMethod
+import com.dividetask.sudokutrainer.domain.pluralName
 import com.dividetask.sudokutrainer.ui.game.Board
 import com.dividetask.sudokutrainer.ui.game.ColorPickerRow
 import com.dividetask.sudokutrainer.ui.game.DigitRow
@@ -178,11 +180,19 @@ private fun MethodStepper(method: TrainerMethod, onMethod: (TrainerMethod) -> Un
     }
 }
 
+/** e.g. "3/7 candidates\n1/2 Pointing Pairs", or "2/9 Hidden Singles". */
+private fun progressText(p: TrainerJudge.Progress, method: TrainerMethod): String {
+    val (done, total) = p.applications
+    val apps = "$done/$total ${if (total == 1) method.techniqueName else method.pluralName}"
+    val notes = p.notes ?: return apps
+    return "${notes.first}/${notes.second} candidates\n$apps"
+}
+
 private fun trainerLabel(
     status: TrainerViewModel.Status,
     state: GameState?,
     method: TrainerMethod,
-    progress: Pair<Int, Int>?,
+    progress: TrainerJudge.Progress?,
     solvedByHint: Boolean,
 ): String = when {
     status == TrainerViewModel.Status.Solved && solvedByHint && state?.phase == GameState.Phase.Hinting -> "Showing again…"
@@ -191,7 +201,6 @@ private fun trainerLabel(
     status == TrainerViewModel.Status.Loading -> "Finding a puzzle…"
     state?.hintUi == HintUi.ErrorFlash -> "Not a ${method.techniqueName}"
     state?.pendingHint != null -> "Look at the highlighted cells"
-    // Placement drills need every single placed; count them off.
-    progress != null -> "${progress.first}/${progress.second} solved"
+    progress != null -> progressText(progress, method)
     else -> ""
 }

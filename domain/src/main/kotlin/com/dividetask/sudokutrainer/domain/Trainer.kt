@@ -90,6 +90,10 @@ enum class TrainerMethod(
     ),
 }
 
+/** The method's name for a count of more than one, e.g. "Naked Pairs". */
+val TrainerMethod.pluralName: String
+    get() = if (techniqueName.endsWith("fish")) techniqueName else "${techniqueName}s"
+
 /** One pencil mark: [digit] in the cell at flat index [cell]. */
 data class NoteRef(val cell: Int, val digit: Int)
 
@@ -106,8 +110,11 @@ data class NoteRef(val cell: Int, val digit: Int)
  *   it finds nothing new; the drill is complete once all targets are
  *   placed.
  * - [instances] (note methods) are the distinct applications of the
- *   method on this board, as hints that can be animated. The drill is
- *   complete once every elimination of any one instance is made.
+ *   method on the starting board, as hints that can be animated.
+ *   [applications] are the eliminations of every application the
+ *   method makes when applied over and over (first instance each time)
+ *   until it finds nothing more; the drill is complete once all of
+ *   them are made.
  */
 data class TrainerDrill(
     val method: TrainerMethod,
@@ -117,10 +124,13 @@ data class TrainerDrill(
     val placements: Set<NoteRef>,
     val instances: List<HintEngine.EliminationHint>,
     val targets: Set<NoteRef> = placements,
+    val applications: List<Set<NoteRef>> = instances.map(::eliminationsOf),
 ) {
-    /** The eliminations each instance makes. */
-    val instanceEliminations: List<Set<NoteRef>> =
-        instances.map { h -> h.plan.flatMap { s -> s.doomedDigits.map { NoteRef(s.cellIdx, it) } }.toSet() }
+    /** The eliminations each starting instance makes. */
+    val instanceEliminations: List<Set<NoteRef>> = instances.map(::eliminationsOf)
+
+    /** Every note the method removes on its way to the end (note drills). */
+    val allEliminations: Set<NoteRef> = applications.flatten().toSet()
 
     /**
      * The starting [GameState] for this drill. Note drills always show
@@ -148,6 +158,10 @@ data class TrainerDrill(
         return GameState(puzzle = puzzle, cells = cells)
     }
 }
+
+/** The notes [hint] removes. */
+internal fun eliminationsOf(hint: HintEngine.EliminationHint): Set<NoteRef> =
+    hint.plan.flatMap { s -> s.doomedDigits.map { NoteRef(s.cellIdx, it) } }.toSet()
 
 /** Builds [TrainerDrill]s by solving puzzles forward with [HintEngine]. */
 object TrainerGenerator {
@@ -225,9 +239,10 @@ object TrainerGenerator {
                 val instances = HintEngine.allEliminations(
                     method.techniqueName, grid, marks!!.map { it.toSet() }.toTypedArray(),
                 )
-                val drill = TrainerDrill(method, puzzle, grid.toList(), markList, emptySet(), instances)
                 if (instances.isEmpty()) return null
-                if (drill.instanceEliminations.any { set -> set.any { puzzle.solution[it.cell] == it.digit } }) return null
+                val applications = eliminationClosure(method, grid, markList)
+                val drill = TrainerDrill(method, puzzle, grid.toList(), markList, emptySet(), instances, applications = applications)
+                if (drill.allEliminations.any { puzzle.solution[it.cell] == it.digit }) return null
                 drill
             }
         }
@@ -247,6 +262,24 @@ object TrainerGenerator {
             if (found.isEmpty()) return out
             for (p in found) { g[p.cell] = p.digit; out += p }
         }
+    }
+
+    /**
+     * Apply [method] to the notes over and over — the first instance it
+     * finds each time, as a hint would — until it finds nothing more.
+     * Returns each application's eliminations, in order.
+     */
+    fun eliminationClosure(method: TrainerMethod, grid: IntArray, marks: List<Set<Int>>): List<Set<NoteRef>> {
+        val m = Array(81) { marks[it].toMutableSet() }
+        val out = mutableListOf<Set<NoteRef>>()
+        repeat(MAX_STEPS) {
+            val h = HintEngine.allEliminations(method.techniqueName, grid, m.map { it.toSet() }.toTypedArray())
+                .firstOrNull() ?: return out
+            val e = eliminationsOf(h)
+            for (n in e) m[n.cell].remove(n.digit)
+            out += e
+        }
+        return out
     }
 
     /** The singles [method] finds on [grid], as placements, in hint order. */
@@ -323,9 +356,9 @@ object TrainerJudge {
      *   placements created. The drill is complete once every target (the
      *   singles the method reaches, repeated to the end) is placed.
      * - Note drills: no value may be placed, and notes may only be
-     *   removed, and only ones that some instance of the method
-     *   eliminates. The drill is complete once every elimination of any
-     *   single instance is made.
+     *   removed — only ones the method removes on its way to the end,
+     *   and only once it can reach them. The drill is complete once all
+     *   of [TrainerDrill.allEliminations] are removed.
      */
     fun judge(drill: TrainerDrill, state: GameState): Verdict {
         if (!drill.method.usesNotes) return judgePlacements(drill, state)
@@ -334,18 +367,53 @@ object TrainerJudge {
             val v = state.cells[i].value ?: continue
             if (drill.grid[i] != v) return Verdict.Wrong
         }
+        val removed = removedNotes(drill, state) ?: return Verdict.Wrong
+        val startElims = drill.instanceEliminations.flatten().toSet()
+        for (r in removed) {
+            if (r !in drill.allEliminations) return Verdict.Wrong
+            // A later elimination only counts once the method reaches it.
+            if (r !in startElims && !justifiedNow(drill, state, r)) return Verdict.Wrong
+        }
+        return if (removed.containsAll(drill.allEliminations)) Verdict.Complete else Verdict.InProgress
+    }
+
+    /** Notes removed since the start, or null if any note was added. */
+    private fun removedNotes(drill: TrainerDrill, state: GameState): Set<NoteRef>? {
         val removed = mutableSetOf<NoteRef>()
         for (i in 0 until 81) {
             if (state.cells[i].value != null) continue
             val now = state.cells[i].pencilMarks.keys
             val start = drill.marks[i]
-            if (!start.containsAll(now)) return Verdict.Wrong
+            if (!start.containsAll(now)) return null
             for (d in start) if (d !in now) removed += NoteRef(i, d)
         }
-        val allowed = drill.instanceEliminations.flatten().toSet()
-        if (!allowed.containsAll(removed)) return Verdict.Wrong
-        return if (drill.instanceEliminations.any { removed.containsAll(it) }) Verdict.Complete
-        else Verdict.InProgress
+        return removed
+    }
+
+    /** Whether, with [note] put back, the method on the current board removes it. */
+    private fun justifiedNow(drill: TrainerDrill, state: GameState, note: NoteRef): Boolean {
+        val grid = IntArray(81) { state.cells[it].value ?: 0 }
+        val marks = Array(81) { state.cells[it].pencilMarks.keys.toSet() }
+        marks[note.cell] = marks[note.cell] + note.digit
+        return HintEngine.allEliminations(drill.method.techniqueName, grid, marks).any { note in eliminationsOf(it) }
+    }
+
+    /**
+     * Progress counters for the drill screen. [notes] is null for
+     * placement drills; [applications] counts singles placed there, and
+     * fully applied instances of the method in note drills.
+     */
+    data class Progress(val notes: Pair<Int, Int>?, val applications: Pair<Int, Int>)
+
+    fun progress(drill: TrainerDrill, state: GameState): Progress {
+        if (!drill.method.usesNotes) {
+            val total = drill.targets.size
+            return Progress(null, (total - remaining(drill, state)) to total)
+        }
+        val removed = removedNotes(drill, state).orEmpty()
+        val notesDone = drill.allEliminations.count { it in removed }
+        val appsDone = drill.applications.count { removed.containsAll(it) }
+        return Progress(notesDone to drill.allEliminations.size, appsDone to drill.applications.size)
     }
 
     /** Targets still to place in a placement drill (0 for note drills). */
@@ -391,11 +459,7 @@ object TrainerJudge {
         )
     }
 
-    /**
-     * The hint to show when the player asks for one. For note drills it
-     * is the instance closest to done, so earlier correct removals
-     * aren't wasted.
-     */
+    /** The hint to show when the player asks for one: the method's next step on the board now. */
     fun hintFor(drill: TrainerDrill, state: GameState): HintEngine.Hint? {
         if (drill.instances.isEmpty()) {
             // Singles open up as the player goes, so look at the board now.
@@ -406,9 +470,10 @@ object TrainerJudge {
                 else -> null
             }
         }
-        val best = drill.instances.indices.maxBy { k ->
-            drill.instanceEliminations[k].count { it.digit !in state.cells[it.cell].pencilMarks }
-        }
-        return drill.instances[best]
+        // Later applications open up as notes go, so look at the board now.
+        val grid = IntArray(81) { state.cells[it].value ?: 0 }
+        val marks = Array(81) { state.cells[it].pencilMarks.keys.toSet() }
+        val now = HintEngine.allEliminations(drill.method.techniqueName, grid, marks)
+        return now.firstOrNull { h -> eliminationsOf(h).all { it in drill.allEliminations } } ?: now.firstOrNull()
     }
 }

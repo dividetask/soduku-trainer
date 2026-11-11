@@ -66,14 +66,24 @@ class TrainerTest {
 
     @ParameterizedTest
     @EnumSource(TrainerMethod::class)
-    fun `applying any one instance completes the drill`(method: TrainerMethod) {
+    fun `applying the method to the end completes the drill`(method: TrainerMethod) {
         val drill = drillFor(method)
         val start = drill.toGameState()
         if (method.usesNotes) {
-            for (elims in drill.instanceEliminations) {
-                assertTrue(elims.none { drill.puzzle.solution[it.cell] == it.digit }, "eliminates a solution digit")
-                assertEquals(TrainerJudge.Verdict.Complete, TrainerJudge.judge(drill, removeNotes(start, elims)))
+            assertTrue(drill.allEliminations.none { drill.puzzle.solution[it.cell] == it.digit }, "eliminates a solution digit")
+            assertTrue(drill.applications.isNotEmpty())
+            // Follow the hints, one application at a time.
+            var s = start
+            for ((n, app) in drill.applications.withIndex()) {
+                val p = TrainerJudge.progress(drill, s)
+                assertEquals(n to drill.applications.size, p.applications)
+                assertEquals(TrainerJudge.Verdict.InProgress, TrainerJudge.judge(drill, s))
+                s = removeNotes(s, app)
+                assertTrue(TrainerJudge.judge(drill, s) != TrainerJudge.Verdict.Wrong, "application $n judged wrong")
             }
+            assertEquals(TrainerJudge.Verdict.Complete, TrainerJudge.judge(drill, s))
+            val done = TrainerJudge.progress(drill, s)
+            assertEquals(drill.allEliminations.size to drill.allEliminations.size, done.notes)
         } else {
             for (p in drill.placements) assertEquals(drill.puzzle.solution[p.cell], p.digit)
         }
@@ -216,6 +226,23 @@ class TrainerTest {
     }
 
     @Test
+    fun `a later application's note removed too early is wrong`() {
+        val random = Random(4242)
+        for (method in TrainerMethod.entries.filter { it.usesNotes }) {
+            repeat(40) {
+                val drill = TrainerGenerator.generate(method, { level -> pool.getValue(level).random(random) }, random)
+                    ?: return@repeat
+                val start = drill.instanceEliminations.flatten().toSet()
+                val late = drill.allEliminations.firstOrNull { it !in start } ?: return@repeat
+                val s = removeNotes(drill.toGameState(), setOf(late))
+                assertEquals(TrainerJudge.Verdict.Wrong, TrainerJudge.judge(drill, s))
+                return
+            }
+        }
+        error("no drill had a note that only a later application removes")
+    }
+
+    @Test
     fun `hidden single is listed before naked single`() {
         assertEquals(TrainerMethod.HiddenSingle, TrainerMethod.entries[0])
         assertEquals(TrainerMethod.NakedSingle, TrainerMethod.entries[1])
@@ -241,6 +268,7 @@ class TrainerTest {
         }
         val instances = HintEngine.allEliminations("X-Wing", grid, marks)
         return TrainerDrill(
+            applications = TrainerGenerator.eliminationClosure(TrainerMethod.XWing, grid, marks.toList()),
             method = TrainerMethod.XWing,
             puzzle = Puzzle("two-x-wings", Difficulty.Expert, List(81) { 0 }, SOLVED),
             grid = grid.toList(),
@@ -264,32 +292,34 @@ class TrainerTest {
     }
 
     @Test
-    fun `either X-Wing completes the drill`() {
+    fun `both X-Wings are needed, in either order`() {
         val drill = twoXWingDrill()
         val start = drill.toGameState()
+        assertEquals(2, drill.applications.size)
         val (a, b) = drill.instanceEliminations
-        assertEquals(TrainerJudge.Verdict.Complete, TrainerJudge.judge(drill, removeNotes(start, a)))
-        assertEquals(TrainerJudge.Verdict.Complete, TrainerJudge.judge(drill, removeNotes(start, b)))
+        for (first in listOf(a, b)) {
+            val s = removeNotes(start, first)
+            assertEquals(TrainerJudge.Verdict.InProgress, TrainerJudge.judge(drill, s))
+            assertEquals(1 to 2, TrainerJudge.progress(drill, s).applications)
+        }
+        assertEquals(TrainerJudge.Verdict.Complete, TrainerJudge.judge(drill, removeNotes(start, a + b)))
     }
 
     @Test
-    fun `a partly applied X-Wing is still in progress`() {
+    fun `progress counts notes and applications separately`() {
         val drill = twoXWingDrill()
         val start = drill.toGameState()
         val (a, b) = drill.instanceEliminations
-        assertEquals(TrainerJudge.Verdict.InProgress, TrainerJudge.judge(drill, removeNotes(start, a.drop(1).toSet())))
-        // Some of each, but neither finished.
+        val total = (a + b).size
+        assertEquals(TrainerJudge.Progress(0 to total, 0 to 2), TrainerJudge.progress(drill, start))
+        // Some of each, but neither finished: notes count, applications don't.
         val mixed = a.drop(1).toSet() + b.drop(1).toSet()
-        assertEquals(TrainerJudge.Verdict.InProgress, TrainerJudge.judge(drill, removeNotes(start, mixed)))
-    }
-
-    @Test
-    fun `finishing one X-Wing after starting the other completes the drill`() {
-        val drill = twoXWingDrill()
-        val start = drill.toGameState()
-        val (a, b) = drill.instanceEliminations
-        val s = removeNotes(start, a.take(2).toSet() + b)
-        assertEquals(TrainerJudge.Verdict.Complete, TrainerJudge.judge(drill, s))
+        val s = removeNotes(start, mixed)
+        assertEquals(TrainerJudge.Verdict.InProgress, TrainerJudge.judge(drill, s))
+        assertEquals(TrainerJudge.Progress(mixed.size to total, 0 to 2), TrainerJudge.progress(drill, s))
+        // Finish one: that application counts.
+        val s2 = removeNotes(start, a + b.take(1).toSet())
+        assertEquals(TrainerJudge.Progress((a.size + 1) to total, 1 to 2), TrainerJudge.progress(drill, s2))
     }
 
     @Test
@@ -324,12 +354,12 @@ class TrainerTest {
     }
 
     @Test
-    fun `hint picks the X-Wing closest to done`() {
+    fun `hint moves on to the X-Wing still to finish`() {
         val drill = twoXWingDrill()
         val start = drill.toGameState()
-        val (_, b) = drill.instanceEliminations
+        val (a, _) = drill.instanceEliminations
         assertEquals(drill.instances[0], TrainerJudge.hintFor(drill, start))
-        val s = removeNotes(start, b.take(1).toSet())
+        val s = removeNotes(start, a)
         assertEquals(drill.instances[1], TrainerJudge.hintFor(drill, s))
     }
 
