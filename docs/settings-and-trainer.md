@@ -36,8 +36,10 @@ bookkeeping steps, not methods, so they aren't listed.)
 ### Drill screen
 
 From the top: the Main menu button, the method's name as a header, a
-short explanation of how it works (at most three sentences), the board,
-the pencil/color and digit rows, then Undo and Hint.
+short explanation of how it works (at most three sentences), buttons for
+the previous and next method in the list (each labeled with that
+method's name; back still returns to the method list), the board, the
+pencil/color and digit rows, then Undo and Hint.
 
 Hidden singles are treated as easier than naked singles everywhere the
 hint engine is used: a hint shows a hidden single whenever one exists,

@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dividetask.sudokutrainer.domain.GameState
@@ -67,6 +68,7 @@ fun TrainerMenuScreen(
 fun TrainerScreen(
     viewModel: TrainerViewModel,
     onMainMenu: () -> Unit,
+    onMethod: (TrainerMethod) -> Unit,
 ) {
     val status by viewModel.status.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -87,6 +89,7 @@ fun TrainerScreen(
             )
             Text(method.techniqueName, style = MaterialTheme.typography.headlineSmall)
             Text(method.explanation, style = MaterialTheme.typography.bodyMedium)
+            MethodStepper(method = method, onMethod = onMethod)
 
             val s = state
             when {
@@ -136,6 +139,33 @@ fun TrainerScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Previous / next method in the trainer list, which runs easiest to hardest. */
+@Composable
+private fun MethodStepper(method: TrainerMethod, onMethod: (TrainerMethod) -> Unit) {
+    val methods = TrainerMethod.entries
+    val prev = methods.getOrNull(method.ordinal - 1)
+    val next = methods.getOrNull(method.ordinal + 1)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        OutlinedButton(
+            onClick = { prev?.let(onMethod) },
+            enabled = prev != null,
+            modifier = Modifier.weight(1f),
+        ) {
+            Text("← ${prev?.techniqueName ?: "Previous"}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        OutlinedButton(
+            onClick = { next?.let(onMethod) },
+            enabled = next != null,
+            modifier = Modifier.weight(1f),
+        ) {
+            Text("${next?.techniqueName ?: "Next"} →", maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

@@ -113,6 +113,12 @@ fun SudokuTrainerApp(
             TrainerScreen(
                 viewModel = viewModel,
                 onMainMenu = { navController.backToMenu() },
+                onMethod = { next ->
+                    // Swap in place, so back still leads to the method list.
+                    navController.navigate(Routes.trainer(next)) {
+                        popUpTo(Routes.TRAINER_METHOD) { inclusive = true }
+                    }
+                },
             )
         }
     }
