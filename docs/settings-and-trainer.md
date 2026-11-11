@@ -62,7 +62,7 @@ tries another puzzle. The board is shown at that point:
 `TrainerJudge` compares the board with the drill's starting position:
 
 - **Placement methods:** every single on the starting board must be
-  placed; the top bar counts how many are left. A single that the
+  placed; the top bar shows progress such as "2/4 solved". A single that the
   player's own placements open up is accepted too. Any other value —
   even a correct one found by a different method — flashes red and is
   undone.

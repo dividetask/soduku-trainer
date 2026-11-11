@@ -82,7 +82,7 @@ fun TrainerScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             TopBar(
-                label = trainerLabel(status, state, method, state?.let(viewModel::remaining) ?: 0),
+                label = trainerLabel(status, state, method, state?.let(viewModel::progress)),
                 onMainMenu = onMainMenu,
             )
             Text(method.techniqueName, style = MaterialTheme.typography.headlineSmall)
@@ -144,13 +144,13 @@ private fun trainerLabel(
     status: TrainerViewModel.Status,
     state: GameState?,
     method: TrainerMethod,
-    remaining: Int,
+    progress: Pair<Int, Int>?,
 ): String = when {
     status == TrainerViewModel.Status.Solved -> "Correct! Next puzzle…"
     status == TrainerViewModel.Status.Loading -> "Finding a puzzle…"
     state?.hintUi == HintUi.ErrorFlash -> "Not a ${method.techniqueName}"
     state?.pendingHint != null -> "Look at the highlighted cells"
-    // Placement drills need every single placed; show how many are left.
-    remaining > 0 -> "$remaining left to place"
+    // Placement drills need every single placed; count them off.
+    progress != null -> "${progress.first}/${progress.second} solved"
     else -> ""
 }
