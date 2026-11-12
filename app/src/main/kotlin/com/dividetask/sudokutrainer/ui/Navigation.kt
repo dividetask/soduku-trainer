@@ -52,9 +52,14 @@ fun SudokuTrainerApp(
             val canResume = remember { savedGames.hasSavedGame() }
             MainMenuScreen(
                 canResume = canResume,
-                onTrainer = { navController.navigate(Routes.TRAINER) },
                 onResume = { navController.navigate(Routes.RESUME) },
-                onStartGame = { difficulty -> navController.navigate(Routes.game(difficulty)) },
+                onNewGame = {
+                    // The difficulty is chosen in Settings; send the player
+                    // there if it somehow isn't set yet.
+                    val difficulty = settingsStore.settings.value.difficulty
+                    navController.navigate(if (difficulty != null) Routes.game(difficulty) else Routes.SETTINGS)
+                },
+                onLesson = { navController.navigate(Routes.TRAINER) },
                 onSettings = { navController.navigate(Routes.SETTINGS) },
             )
         }

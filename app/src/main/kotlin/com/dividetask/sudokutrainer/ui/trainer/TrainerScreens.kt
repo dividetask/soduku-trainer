@@ -31,6 +31,7 @@ import com.dividetask.sudokutrainer.ui.game.Board
 import com.dividetask.sudokutrainer.ui.game.ColorPickerRow
 import com.dividetask.sudokutrainer.ui.game.DigitRow
 import com.dividetask.sudokutrainer.ui.game.HintButton
+import com.dividetask.sudokutrainer.ui.VersionLabel
 import com.dividetask.sudokutrainer.ui.game.TopBar
 
 /** One button per solving method. */
@@ -135,6 +136,7 @@ fun TrainerScreen(
                             modifier = Modifier.weight(1f),
                         )
                     }
+                    VersionLabel()
                 }
             }
         }

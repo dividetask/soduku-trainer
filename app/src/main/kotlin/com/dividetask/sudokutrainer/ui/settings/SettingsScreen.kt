@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dividetask.sudokutrainer.data.Settings
 import com.dividetask.sudokutrainer.data.SettingsStore
+import com.dividetask.sudokutrainer.domain.Difficulty
 
 @Composable
 fun SettingsScreen(
@@ -39,6 +41,23 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("Settings", style = MaterialTheme.typography.displaySmall)
+            Text("Puzzle difficulty", style = MaterialTheme.typography.titleLarge)
+            // No default: on first launch the player picks one before Done.
+            Difficulty.entries.forEach { d ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { store.update(settings.copy(difficulty = d)) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(
+                        selected = settings.difficulty == d,
+                        onClick = { store.update(settings.copy(difficulty = d)) },
+                    )
+                    Text("${d.level}. ${d.label}", style = MaterialTheme.typography.titleMedium)
+                }
+            }
+            Text("Options", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 8.dp))
             SettingRow(
                 title = "Autofill starting candidates",
                 detail = "Start each game as if Sweep were pressed, filling in every cell's notes.",
@@ -60,8 +79,12 @@ fun SettingsScreen(
                     "already placed in its row, column or box. Colored notes are still allowed.",
                 checked = settings.preventIncorrectNotes,
             ) { store.update(settings.copy(preventIncorrectNotes = it)) }
+            if (settings.difficulty == null) {
+                Text("Pick a puzzle difficulty to continue.", style = MaterialTheme.typography.bodyMedium)
+            }
             Button(
                 onClick = onDone,
+                enabled = settings.difficulty != null,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp),

@@ -7,32 +7,36 @@ screen). Settings and the Trainer are specified in
 covers the Main Menu and Game Screen.
 
 On the very first launch the app opens on Settings; its **Done** button
-leads to the Main Menu. Every later launch opens on the Main Menu.
+(enabled once a puzzle difficulty is picked) leads to the Main Menu.
+Every later launch opens on the Main Menu.
+
+The Game Screen and the Trainer drill screen show the app's version
+(`BuildConfig.VERSION_NAME`, e.g. `v2.015 a (e687)`) in small grey text
+at the bottom, so screenshots identify the build.
 
 ## 1. Main Menu
 
 The landing screen.
 
-### Controls, top to bottom
+### Controls
 
-- **Trainer** — Opens the Trainer's method list.
+- **Settings** — A gear icon in the top-right corner; opens Settings,
+  whose Done returns here.
 - **Resume** — Shown only when an unfinished game is saved; continues
   the most recent game exactly where it was left, undo history included.
-- **1. Beginner … 9. Extreme** — Starts a new game at that difficulty.
+- **New Game** — Starts a new game at the difficulty chosen in Settings.
   Starting a new game replaces any saved game.
-- **Settings** — Opens Settings; Done returns here.
+- **Lesson** — Opens the Trainer's method list.
 
 ### Layout (suggested)
 
 ```
 +-------------------------------+
+|                          [⚙]  |
 |         Sudoku Trainer        |
-|          [ Trainer  ]         |
 |          [  Resume  ]         |
-|          [1. Beginner]        |
-|              ...              |
-|          [9. Extreme ]        |
-|          [ Settings ]         |
+|          [ New Game ]         |
+|          [  Lesson  ]         |
 +-------------------------------+
 ```
 

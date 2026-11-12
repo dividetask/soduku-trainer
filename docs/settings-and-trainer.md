@@ -2,9 +2,15 @@
 
 ## Settings
 
-Shown first on the very first launch; afterwards reached from the Main
-Menu. Each option is a checkbox, stored on the device, and all are **on**
-by default.
+Shown first on the very first launch; afterwards reached from the gear
+icon on the Main Menu. Everything is stored on the device.
+
+**Puzzle difficulty** — radio buttons for the nine levels (Beginner …
+Extreme); New Game uses the one selected. There is no default: on first
+launch nothing is selected and Done stays disabled until the player
+picks one.
+
+The options below are checkboxes, all **on** by default.
 
 | Setting | Effect |
 |---------|--------|

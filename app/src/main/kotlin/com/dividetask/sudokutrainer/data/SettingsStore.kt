@@ -1,12 +1,15 @@
 package com.dividetask.sudokutrainer.data
 
 import android.content.Context
+import com.dividetask.sudokutrainer.domain.Difficulty
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /** Player-facing options, chosen on the Settings screen. */
 data class Settings(
+    /** Difficulty for New Game. Null until the player picks one; there is no default. */
+    val difficulty: Difficulty? = null,
     /** Run a Candidate Sweep when a game starts, filling in every note. */
     val autofillCandidates: Boolean = true,
     /** Animate how a hint reaches its answer; off applies it at once. */
@@ -30,6 +33,7 @@ class SettingsStore(context: Context) {
 
     fun update(settings: Settings) {
         prefs.edit()
+            .putString(KEY_DIFFICULTY, settings.difficulty?.name)
             .putBoolean(KEY_AUTOFILL, settings.autofillCandidates)
             .putBoolean(KEY_SHOW_WORK, settings.showHintWork)
             .putBoolean(KEY_PREVENT_VALUES, settings.preventIncorrectValues)
@@ -45,6 +49,8 @@ class SettingsStore(context: Context) {
     private fun load(): Settings {
         val d = Settings()
         return Settings(
+            difficulty = prefs.getString(KEY_DIFFICULTY, null)
+                ?.let { name -> Difficulty.entries.firstOrNull { it.name == name } },
             autofillCandidates = prefs.getBoolean(KEY_AUTOFILL, d.autofillCandidates),
             showHintWork = prefs.getBoolean(KEY_SHOW_WORK, d.showHintWork),
             preventIncorrectValues = prefs.getBoolean(KEY_PREVENT_VALUES, d.preventIncorrectValues),
@@ -54,6 +60,7 @@ class SettingsStore(context: Context) {
 
     private companion object {
         const val KEY_SEEN = "first_run_done"
+        const val KEY_DIFFICULTY = "difficulty"
         const val KEY_AUTOFILL = "autofill_candidates"
         const val KEY_SHOW_WORK = "show_hint_work"
         const val KEY_PREVENT_VALUES = "prevent_incorrect_values"

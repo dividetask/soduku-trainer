@@ -17,8 +17,20 @@ android {
         applicationId = "com.dividetask.sudokutrainer"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // versionCode: timestamp-based, always increasing across branches.
+        // versionName: predicted APK filename (vMAJOR.MINOR.apk = newest committed
+        // APK minor + 1), a per-commit letter (a, b, c… for each commit pushed
+        // before a new APK lands; resets to 'a' once a new APK is built), and the
+        // 4-char hash of the commit Gradle built from. The first two are set by
+        // hand; the hash is added at build time because a commit can't contain
+        // its own hash.
+        versionCode = (System.currentTimeMillis() / 60000).toInt()
+        val versionBase = "v2.015 a"
+        val commitHash = try {
+            val process = Runtime.getRuntime().exec(arrayOf("git", "rev-parse", "--short=4", "HEAD"))
+            process.inputStream.bufferedReader().readText().trim().ifEmpty { "unknown" }
+        } catch (_: Exception) { "unknown" }
+        versionName = "$versionBase ($commitHash)"
     }
 
     buildTypes {
@@ -38,6 +50,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -64,6 +77,7 @@ dependencies {
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons.core)
 
     debugImplementation(libs.compose.ui.tooling)
 }

@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dividetask.sudokutrainer.domain.GameState
 import com.dividetask.sudokutrainer.domain.HintUi
+import com.dividetask.sudokutrainer.ui.VersionLabel
 
 @Composable
 fun GameScreen(
@@ -65,6 +66,7 @@ fun GameScreen(
                     onHint = viewModel::onHint,
                     onShowAgain = viewModel::onShowAgain,
                 )
+                VersionLabel()
             }
 
             // (overlays below)
