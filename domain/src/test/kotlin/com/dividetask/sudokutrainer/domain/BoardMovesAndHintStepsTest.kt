@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test
  *   rule.
  * - Solve action phase transition.
  */
-class GameReducerTest {
+class BoardMovesAndHintStepsTest {
 
     private val solution = intArrayOf(
         5, 3, 4, 6, 7, 8, 9, 1, 2,
@@ -61,22 +61,22 @@ class GameReducerTest {
     @Test
     fun `selectDigit sets active and re-selecting deactivates`() {
         var s = initial()
-        s = GameReducer.selectDigit(s, 5)
+        s = BoardMoves.selectDigit(s, 5)
         assertEquals(5, s.activeDigit)
-        s = GameReducer.selectDigit(s, 5)
+        s = BoardMoves.selectDigit(s, 5)
         assertNull(s.activeDigit)
-        s = GameReducer.selectDigit(s, 3)
-        s = GameReducer.selectDigit(s, 7)
+        s = BoardMoves.selectDigit(s, 3)
+        s = BoardMoves.selectDigit(s, 7)
         assertEquals(7, s.activeDigit)
     }
 
     @Test
     fun `normal-mode tap on empty cell writes value in active color`() {
-        var s = initial().let { GameReducer.selectDigit(it, 4) }
-        s = GameReducer.selectColor(s, GuessColor.Green)
+        var s = initial().let { BoardMoves.selectDigit(it, 4) }
+        s = BoardMoves.selectColor(s, GuessColor.Green)
         // (0,2) is empty (given is 0). Solution there is 4, but reducer
         // must not care about correctness.
-        s = GameReducer.tapCell(s, 0, 2)
+        s = BoardMoves.tapCell(s, 0, 2)
         val c = s.cellAt(0, 2)
         assertEquals(4, c.value)
         assertEquals(CellColor.Guess(GuessColor.Green), c.valueColor)
@@ -86,21 +86,21 @@ class GameReducerTest {
 
     @Test
     fun `normal-mode tap on filled cell is a no-op (no overwrite)`() {
-        var s = initial().let { GameReducer.selectDigit(it, 4) }
-        s = GameReducer.tapCell(s, 0, 2)
+        var s = initial().let { BoardMoves.selectDigit(it, 4) }
+        s = BoardMoves.tapCell(s, 0, 2)
         val afterFirst = s
         // Now try to overwrite with a different digit.
-        s = GameReducer.selectDigit(s, 9)
-        s = GameReducer.tapCell(s, 0, 2)
+        s = BoardMoves.selectDigit(s, 9)
+        s = BoardMoves.tapCell(s, 0, 2)
         assertEquals(afterFirst.cellAt(0, 2), s.cellAt(0, 2))
         assertEquals(afterFirst.history.size, s.history.size)
     }
 
     @Test
     fun `normal-mode tap on given is a no-op`() {
-        var s = initial().let { GameReducer.selectDigit(it, 9) }
+        var s = initial().let { BoardMoves.selectDigit(it, 9) }
         // (0,0) is a given (5).
-        s = GameReducer.tapCell(s, 0, 0)
+        s = BoardMoves.tapCell(s, 0, 0)
         assertEquals(5, s.cellAt(0, 0).value)
         assertTrue(s.history.isEmpty())
     }
@@ -109,23 +109,23 @@ class GameReducerTest {
     fun `writing a value hides (clears) that cell's pencil marks and undo restores them`() {
         var s = initial()
         // Place a few pencil marks on (0,2) in pencil mode.
-        s = GameReducer.togglePencil(s)
-        s = GameReducer.selectDigit(s, 1)
-        s = GameReducer.tapCell(s, 0, 2)
-        s = GameReducer.selectDigit(s, 4)
-        s = GameReducer.tapCell(s, 0, 2)
-        s = GameReducer.selectDigit(s, 7)
-        s = GameReducer.tapCell(s, 0, 2)
+        s = BoardMoves.togglePencil(s)
+        s = BoardMoves.selectDigit(s, 1)
+        s = BoardMoves.tapCell(s, 0, 2)
+        s = BoardMoves.selectDigit(s, 4)
+        s = BoardMoves.tapCell(s, 0, 2)
+        s = BoardMoves.selectDigit(s, 7)
+        s = BoardMoves.tapCell(s, 0, 2)
         assertEquals(setOf(1, 4, 7), s.cellAt(0, 2).pencilMarks.keys)
         // Now flip pencil off, select 9, tap — the value is written and the
         // marks are hidden (stored in the move for undo).
-        s = GameReducer.togglePencil(s)
-        s = GameReducer.selectDigit(s, 9)
-        s = GameReducer.tapCell(s, 0, 2)
+        s = BoardMoves.togglePencil(s)
+        s = BoardMoves.selectDigit(s, 9)
+        s = BoardMoves.tapCell(s, 0, 2)
         assertEquals(9, s.cellAt(0, 2).value)
         assertTrue(s.cellAt(0, 2).pencilMarks.isEmpty())
         // Undo: value gone, marks restored.
-        s = GameReducer.undo(s)
+        s = BoardMoves.undo(s)
         assertNull(s.cellAt(0, 2).value)
         assertEquals(setOf(1, 4, 7), s.cellAt(0, 2).pencilMarks.keys)
     }
@@ -133,23 +133,23 @@ class GameReducerTest {
     @Test
     fun `pencil-mode tap on empty cell toggles the mark`() {
         var s = initial()
-        s = GameReducer.togglePencil(s)
-        s = GameReducer.selectDigit(s, 3)
-        s = GameReducer.tapCell(s, 0, 2)
+        s = BoardMoves.togglePencil(s)
+        s = BoardMoves.selectDigit(s, 3)
+        s = BoardMoves.tapCell(s, 0, 2)
         assertEquals(setOf(3), s.cellAt(0, 2).pencilMarks.keys)
         // Tapping again removes it.
-        s = GameReducer.tapCell(s, 0, 2)
+        s = BoardMoves.tapCell(s, 0, 2)
         assertTrue(s.cellAt(0, 2).pencilMarks.isEmpty())
     }
 
     @Test
     fun `pencil-mode tap on filled cell is a no-op`() {
-        var s = initial().let { GameReducer.selectDigit(it, 4) }
-        s = GameReducer.tapCell(s, 0, 2) // write 4
-        s = GameReducer.togglePencil(s)
-        s = GameReducer.selectDigit(s, 7)
+        var s = initial().let { BoardMoves.selectDigit(it, 4) }
+        s = BoardMoves.tapCell(s, 0, 2) // write 4
+        s = BoardMoves.togglePencil(s)
+        s = BoardMoves.selectDigit(s, 7)
         val before = s
-        s = GameReducer.tapCell(s, 0, 2)
+        s = BoardMoves.tapCell(s, 0, 2)
         assertEquals(before.cellAt(0, 2), s.cellAt(0, 2))
         assertEquals(before.history.size, s.history.size)
     }
@@ -162,16 +162,16 @@ class GameReducerTest {
         // the value. We need the marks to still be absent in the cell
         // (they were cleared by the SetValue move) — so double-tap leaves
         // the cell empty with no marks.
-        s = GameReducer.togglePencil(s)
-        s = GameReducer.selectDigit(s, 2)
-        s = GameReducer.tapCell(s, 0, 2)
-        s = GameReducer.togglePencil(s)
-        s = GameReducer.selectDigit(s, 4)
-        s = GameReducer.tapCell(s, 0, 2)
+        s = BoardMoves.togglePencil(s)
+        s = BoardMoves.selectDigit(s, 2)
+        s = BoardMoves.tapCell(s, 0, 2)
+        s = BoardMoves.togglePencil(s)
+        s = BoardMoves.selectDigit(s, 4)
+        s = BoardMoves.tapCell(s, 0, 2)
         assertEquals(4, s.cellAt(0, 2).value)
         assertTrue(s.cellAt(0, 2).pencilMarks.isEmpty())
 
-        s = GameReducer.doubleTapCell(s, 0, 2)
+        s = BoardMoves.doubleTapCell(s, 0, 2)
         assertNull(s.cellAt(0, 2).value)
         assertTrue(s.cellAt(0, 2).pencilMarks.isEmpty())
         assertTrue(s.history.last() is Move.ClearValue)
@@ -181,16 +181,16 @@ class GameReducerTest {
     fun `double-tap on empty cell and on given is a no-op`() {
         var s = initial()
         val before = s
-        s = GameReducer.doubleTapCell(s, 0, 2) // empty
+        s = BoardMoves.doubleTapCell(s, 0, 2) // empty
         assertSame(before, s)
-        s = GameReducer.doubleTapCell(s, 0, 0) // given
+        s = BoardMoves.doubleTapCell(s, 0, 0) // given
         assertSame(before, s)
     }
 
     @Test
     fun `undo on empty history is a no-op`() {
         val s = initial()
-        val s2 = GameReducer.undo(s)
+        val s2 = BoardMoves.undo(s)
         assertSame(s, s2)
     }
 
@@ -207,8 +207,8 @@ class GameReducerTest {
             }
         }
         // Activate digit 5 and tap each target.
-        s = GameReducer.selectDigit(s, 5)
-        for ((r, c) in targets) s = GameReducer.tapCell(s, r, c)
+        s = BoardMoves.selectDigit(s, 5)
+        for ((r, c) in targets) s = BoardMoves.tapCell(s, r, c)
         assertEquals(9, s.placedCountOf(5))
         assertTrue(s.isDigitExhausted(5))
         assertFalse(s.isDigitExhausted(4))
@@ -225,8 +225,8 @@ class GameReducerTest {
             val r = i / 9
             val c = i % 9
             val d = solution[i]
-            if (s.activeDigit != d) s = GameReducer.selectDigit(s, d)
-            s = GameReducer.tapCell(s, r, c)
+            if (s.activeDigit != d) s = BoardMoves.selectDigit(s, d)
+            s = BoardMoves.tapCell(s, r, c)
         }
         assertEquals(81, s.correctCount)
         assertTrue(s.isMostlySolved(10))
@@ -235,11 +235,11 @@ class GameReducerTest {
         val wrongTarget = (0 until 81).first { givens[it] == 0 }
         val wr = wrongTarget / 9
         val wc = wrongTarget % 9
-        s = GameReducer.doubleTapCell(s, wr, wc)
+        s = BoardMoves.doubleTapCell(s, wr, wc)
         val correct = solution[wrongTarget]
         val wrong = if (correct == 9) 1 else correct + 1
-        s = GameReducer.selectDigit(s, wrong)
-        s = GameReducer.tapCell(s, wr, wc)
+        s = BoardMoves.selectDigit(s, wrong)
+        s = BoardMoves.tapCell(s, wr, wc)
         assertTrue(s.hasIncorrectEntry)
         assertFalse(s.isMostlySolved(10), "any incorrect entry must block mostly-solved")
     }
@@ -247,9 +247,9 @@ class GameReducerTest {
     @Test
     fun `applySolve fills empty cells in Solve color and transitions phase`() {
         var s = initial()
-        s = GameReducer.selectDigit(s, 4)
-        s = GameReducer.tapCell(s, 0, 2) // write a player entry (keep this as Guess)
-        s = GameReducer.applySolve(s)
+        s = BoardMoves.selectDigit(s, 4)
+        s = BoardMoves.tapCell(s, 0, 2) // write a player entry (keep this as Guess)
+        s = AutoSolve.solveAll(s)
         assertEquals(GameState.Phase.Celebrating, s.phase)
         assertTrue(s.history.isEmpty())
         // The player entry we placed must keep its Guess color.
@@ -263,31 +263,31 @@ class GameReducerTest {
     @Test
     fun `toggling pencil and selecting color are not undoable`() {
         var s = initial()
-        s = GameReducer.togglePencil(s)
-        s = GameReducer.selectColor(s, GuessColor.Purple)
-        s = GameReducer.selectDigit(s, 3)
+        s = BoardMoves.togglePencil(s)
+        s = BoardMoves.selectColor(s, GuessColor.Purple)
+        s = BoardMoves.selectDigit(s, 3)
         assertTrue(s.history.isEmpty())
     }
 
     @Test
     fun `undo restores pencil mark toggles in sequence`() {
         var s = initial()
-        s = GameReducer.togglePencil(s)
-        s = GameReducer.selectDigit(s, 2)
-        s = GameReducer.tapCell(s, 0, 2) // add 2
-        s = GameReducer.selectDigit(s, 5)
-        s = GameReducer.tapCell(s, 0, 2) // add 5
-        s = GameReducer.tapCell(s, 0, 2) // remove 5
+        s = BoardMoves.togglePencil(s)
+        s = BoardMoves.selectDigit(s, 2)
+        s = BoardMoves.tapCell(s, 0, 2) // add 2
+        s = BoardMoves.selectDigit(s, 5)
+        s = BoardMoves.tapCell(s, 0, 2) // add 5
+        s = BoardMoves.tapCell(s, 0, 2) // remove 5
         assertEquals(setOf(2), s.cellAt(0, 2).pencilMarks.keys)
-        s = GameReducer.undo(s) // re-add 5
+        s = BoardMoves.undo(s) // re-add 5
         assertEquals(setOf(2, 5), s.cellAt(0, 2).pencilMarks.keys)
-        s = GameReducer.undo(s) // remove 5 (inverse of add)
+        s = BoardMoves.undo(s) // remove 5 (inverse of add)
         assertEquals(setOf(2), s.cellAt(0, 2).pencilMarks.keys)
-        s = GameReducer.undo(s) // remove 2
+        s = BoardMoves.undo(s) // remove 2
         assertTrue(s.cellAt(0, 2).pencilMarks.isEmpty())
         // Empty history now; further undo is a no-op.
         val before = s
-        s = GameReducer.undo(s)
+        s = BoardMoves.undo(s)
         assertSame(before, s)
     }
 
@@ -295,16 +295,16 @@ class GameReducerTest {
     fun `Blue (Solve) placement auto-clears Blue pencil marks from peers`() {
         var s = initial()
         // Place Blue pencil marks for digit 4 in several cells in row 0.
-        s = GameReducer.togglePencil(s)
-        s = GameReducer.selectDigit(s, 4)
-        s = GameReducer.tapCell(s, 0, 2) // add Blue 4 mark
-        s = GameReducer.tapCell(s, 0, 3) // add Blue 4 mark
-        s = GameReducer.tapCell(s, 0, 5) // add Blue 4 mark
+        s = BoardMoves.togglePencil(s)
+        s = BoardMoves.selectDigit(s, 4)
+        s = BoardMoves.tapCell(s, 0, 2) // add Blue 4 mark
+        s = BoardMoves.tapCell(s, 0, 3) // add Blue 4 mark
+        s = BoardMoves.tapCell(s, 0, 5) // add Blue 4 mark
         // Replace the Blue 4 mark at (0,3) with a Red one.
         // First toggle off Blue 4, then switch color and add Red 4.
-        s = GameReducer.tapCell(s, 0, 3) // removes Blue 4
-        s = GameReducer.selectColor(s, GuessColor.Red)
-        s = GameReducer.tapCell(s, 0, 3) // adds Red 4
+        s = BoardMoves.tapCell(s, 0, 3) // removes Blue 4
+        s = BoardMoves.selectColor(s, GuessColor.Red)
+        s = BoardMoves.tapCell(s, 0, 3) // adds Red 4
 
         assertEquals(GuessColor.Blue, s.cellAt(0, 2).pencilMarks[4])
         assertEquals(GuessColor.Red, s.cellAt(0, 3).pencilMarks[4])
@@ -312,9 +312,9 @@ class GameReducerTest {
 
         // Now place digit 4 in Blue (Solve) mode at (0,2).
         // Digit 4 is already active from the pencil-mark phase above.
-        s = GameReducer.togglePencil(s) // pencil off
-        s = GameReducer.selectColor(s, GuessColor.Blue)
-        s = GameReducer.tapCell(s, 0, 2)
+        s = BoardMoves.togglePencil(s) // pencil off
+        s = BoardMoves.selectColor(s, GuessColor.Blue)
+        s = BoardMoves.tapCell(s, 0, 2)
         assertEquals(4, s.cellAt(0, 2).value)
 
         // Blue 4 mark at (0,5) should be auto-cleared (same row).
@@ -326,14 +326,14 @@ class GameReducerTest {
     @Test
     fun `undo of Blue placement restores auto-cleared marks`() {
         var s = initial()
-        s = GameReducer.togglePencil(s)
-        s = GameReducer.selectDigit(s, 4)
-        s = GameReducer.tapCell(s, 0, 5) // add Blue 4 mark at (0,5)
-        s = GameReducer.togglePencil(s)
-        s = GameReducer.tapCell(s, 0, 2) // place Blue 4 at (0,2) — auto-clears (0,5)
+        s = BoardMoves.togglePencil(s)
+        s = BoardMoves.selectDigit(s, 4)
+        s = BoardMoves.tapCell(s, 0, 5) // add Blue 4 mark at (0,5)
+        s = BoardMoves.togglePencil(s)
+        s = BoardMoves.tapCell(s, 0, 2) // place Blue 4 at (0,2) — auto-clears (0,5)
         assertNull(s.cellAt(0, 5).pencilMarks[4])
         // Undo should restore the Blue 4 mark at (0,5).
-        s = GameReducer.undo(s)
+        s = BoardMoves.undo(s)
         assertNull(s.cellAt(0, 2).value)
         assertEquals(GuessColor.Blue, s.cellAt(0, 5).pencilMarks[4])
     }
@@ -341,12 +341,12 @@ class GameReducerTest {
     @Test
     fun `non-Blue placement does not auto-clear`() {
         var s = initial()
-        s = GameReducer.togglePencil(s)
-        s = GameReducer.selectDigit(s, 4)
-        s = GameReducer.tapCell(s, 0, 5) // add Blue 4 mark
-        s = GameReducer.togglePencil(s)
-        s = GameReducer.selectColor(s, GuessColor.Red)
-        s = GameReducer.tapCell(s, 0, 2) // place Red 4 at (0,2)
+        s = BoardMoves.togglePencil(s)
+        s = BoardMoves.selectDigit(s, 4)
+        s = BoardMoves.tapCell(s, 0, 5) // add Blue 4 mark
+        s = BoardMoves.togglePencil(s)
+        s = BoardMoves.selectColor(s, GuessColor.Red)
+        s = BoardMoves.tapCell(s, 0, 2) // place Red 4 at (0,2)
         // Blue 4 mark at (0,5) should still be there.
         assertEquals(GuessColor.Blue, s.cellAt(0, 5).pencilMarks[4])
     }
@@ -361,7 +361,7 @@ class GameReducerTest {
         // The found cell must match the puzzle's solution at that index.
         assertEquals(puzzle.solutionAt(tRow, tCol), hint.solutionDigit)
 
-        var s = GameReducer.beginNakedSingleHint(s0, hint)
+        var s = NakedSingleSteps.begin(s0, hint)
         assertEquals(GameState.Phase.Hinting, s.phase)
         val notes = s.cellAt(tRow, tCol).pencilMarks
         assertEquals((1..9).toSet(), notes.keys)
@@ -369,7 +369,7 @@ class GameReducerTest {
 
         // Sweep: eliminate every non-solution digit.
         for (d in 1..9) {
-            s = GameReducer.advanceNakedSingleStep(
+            s = NakedSingleSteps.advance(
                 state = s,
                 activeDigit = d,
                 eliminatorCells = hint.eliminators[d].orEmpty(),
@@ -379,7 +379,7 @@ class GameReducerTest {
         // Only the solution digit remains as a pencil mark.
         assertEquals(setOf(hint.solutionDigit), s.cellAt(tRow, tCol).pencilMarks.keys)
 
-        s = GameReducer.completeNakedSingleHint(s, hint)
+        s = NakedSingleSteps.complete(s, hint)
         assertEquals(GameState.Phase.Playing, s.phase)
         assertNull(s.hintUi)
         assertEquals(hint.solutionDigit, s.cellAt(tRow, tCol).value)
@@ -398,7 +398,7 @@ class GameReducerTest {
         grid[4 * 9 + 2] = 5
         grid[1 * 9 + 5] = 5
         grid[2 * 9 + 7] = 5
-        val hint = HintEngine.find(grid) as HintEngine.HiddenSingle
+        val hint = HintEngine.find(grid) as Hint.HiddenSingle
         assertEquals(0, hint.targetCell)
         assertEquals(5, hint.solutionDigit)
 
@@ -414,7 +414,7 @@ class GameReducerTest {
         )
         var s = GameState.forNewGame(fakePuzzle)
 
-        s = GameReducer.beginHiddenSingleHint(s, hint)
+        s = HiddenSingleSteps.begin(s, hint)
         assertEquals(GameState.Phase.Hinting, s.phase)
         assertTrue(s.hintUi is HintUi.HiddenSingle)
         // Every empty cell in the unit now carries the solution digit as a mark.
@@ -428,7 +428,7 @@ class GameReducerTest {
         for (idx in hint.unit.cells) {
             if (idx == hint.targetCell) continue
             if (s.cells[idx].value != null) continue
-            s = GameReducer.advanceHiddenSingleStep(
+            s = HiddenSingleSteps.advance(
                 state = s,
                 currentCell = idx,
                 eliminatorCells = hint.eliminators[idx].orEmpty(),
@@ -436,10 +436,10 @@ class GameReducerTest {
             assertNull(s.cells[idx].pencilMarks[5])
         }
         // Settle frame: target still has the mark; everyone else doesn't.
-        s = GameReducer.advanceHiddenSingleStep(s, currentCell = null, eliminatorCells = emptySet())
+        s = HiddenSingleSteps.advance(s, currentCell = null, eliminatorCells = emptySet())
         assertEquals(GuessColor.DEFAULT, s.cells[hint.targetCell].pencilMarks[5])
 
-        s = GameReducer.completeHiddenSingleHint(s, hint)
+        s = HiddenSingleSteps.complete(s, hint)
         assertEquals(GameState.Phase.Playing, s.phase)
         assertNull(s.hintUi)
         assertEquals(5, s.cells[hint.targetCell].value)
@@ -455,33 +455,33 @@ class GameReducerTest {
         val hint = HintEngine.allNakedSingles(grid).first()
         val tRow = hint.targetCell / 9
         val tCol = hint.targetCell % 9
-        s = GameReducer.togglePencil(s)
-        s = GameReducer.selectColor(s, GuessColor.Red)
-        s = GameReducer.selectDigit(s, 2)
-        s = GameReducer.tapCell(s, tRow, tCol)
-        s = GameReducer.selectDigit(s, 7)
-        s = GameReducer.tapCell(s, tRow, tCol)
-        s = GameReducer.togglePencil(s)
+        s = BoardMoves.togglePencil(s)
+        s = BoardMoves.selectColor(s, GuessColor.Red)
+        s = BoardMoves.selectDigit(s, 2)
+        s = BoardMoves.tapCell(s, tRow, tCol)
+        s = BoardMoves.selectDigit(s, 7)
+        s = BoardMoves.tapCell(s, tRow, tCol)
+        s = BoardMoves.togglePencil(s)
         val historySizeBeforeHint = s.history.size
         assertEquals(setOf(2, 7), s.cellAt(tRow, tCol).pencilMarks.keys)
 
         // Run the hint to completion.
-        s = GameReducer.beginNakedSingleHint(s, hint)
+        s = NakedSingleSteps.begin(s, hint)
         for (d in 1..9) {
-            s = GameReducer.advanceNakedSingleStep(
+            s = NakedSingleSteps.advance(
                 state = s,
                 activeDigit = d,
                 eliminatorCells = hint.eliminators[d].orEmpty(),
                 eliminate = d != hint.solutionDigit,
             )
         }
-        s = GameReducer.completeNakedSingleHint(s, hint)
+        s = NakedSingleSteps.complete(s, hint)
         assertEquals(hint.solutionDigit, s.cellAt(tRow, tCol).value)
         assertEquals(historySizeBeforeHint + 1, s.history.size)
         assertTrue(s.history.last() is Move.SetValue)
 
         // Undo: value gone, prior pencil marks restored.
-        s = GameReducer.undo(s)
+        s = BoardMoves.undo(s)
         assertNull(s.cellAt(tRow, tCol).value)
         assertEquals(GuessColor.Red, s.cellAt(tRow, tCol).pencilMarks[2])
         assertEquals(GuessColor.Red, s.cellAt(tRow, tCol).pencilMarks[7])
@@ -496,7 +496,7 @@ class GameReducerTest {
         grid[4 * 9 + 2] = 5
         grid[1 * 9 + 5] = 5
         grid[2 * 9 + 7] = 5
-        val hint = HintEngine.find(grid) as HintEngine.HiddenSingle
+        val hint = HintEngine.find(grid) as Hint.HiddenSingle
         val fakeSolution = IntArray(81) { i -> if (grid[i] != 0) grid[i] else 1 }
         fakeSolution[0] = 5
         val fakePuzzle = Puzzle(
@@ -509,33 +509,33 @@ class GameReducerTest {
 
         // Player has placed a Purple 5 pencil mark in (0,1) — a non-target
         // cell in box 0 that the sweep will erase.
-        s = GameReducer.togglePencil(s)
-        s = GameReducer.selectColor(s, GuessColor.Purple)
-        s = GameReducer.selectDigit(s, 5)
-        s = GameReducer.tapCell(s, 0, 1)
-        s = GameReducer.togglePencil(s)
+        s = BoardMoves.togglePencil(s)
+        s = BoardMoves.selectColor(s, GuessColor.Purple)
+        s = BoardMoves.selectDigit(s, 5)
+        s = BoardMoves.tapCell(s, 0, 1)
+        s = BoardMoves.togglePencil(s)
         assertEquals(GuessColor.Purple, s.cellAt(0, 1).pencilMarks[5])
         val historySizeBeforeHint = s.history.size
 
         // Run the hidden single hint to completion.
-        s = GameReducer.beginHiddenSingleHint(s, hint)
+        s = HiddenSingleSteps.begin(s, hint)
         for (idx in hint.unit.cells) {
             if (idx == hint.targetCell) continue
             if (s.cells[idx].value != null) continue
-            s = GameReducer.advanceHiddenSingleStep(
+            s = HiddenSingleSteps.advance(
                 state = s,
                 currentCell = idx,
                 eliminatorCells = hint.eliminators[idx].orEmpty(),
             )
         }
-        s = GameReducer.advanceHiddenSingleStep(s, currentCell = null, eliminatorCells = emptySet())
-        s = GameReducer.completeHiddenSingleHint(s, hint)
+        s = HiddenSingleSteps.advance(s, currentCell = null, eliminatorCells = emptySet())
+        s = HiddenSingleSteps.complete(s, hint)
         assertEquals(5, s.cellAt(0, 0).value)
         assertNull(s.cellAt(0, 1).pencilMarks[5])
         assertEquals(historySizeBeforeHint + 1, s.history.size)
 
         // Undo: value gone, player's Purple 5 mark restored on (0,1).
-        s = GameReducer.undo(s)
+        s = BoardMoves.undo(s)
         assertNull(s.cellAt(0, 0).value)
         assertEquals(GuessColor.Purple, s.cellAt(0, 1).pencilMarks[5])
         assertEquals(historySizeBeforeHint, s.history.size)
@@ -568,13 +568,13 @@ class GameReducerTest {
             solution = solution.toList(),
         )
         var s = GameState.forNewGame(fake)
-        val hint = HintEngine.find(grid) as HintEngine.CandidateSweep
+        val hint = HintEngine.find(grid) as Hint.CandidateSweep
         assertTrue(hint.initialFill)
 
-        s = GameReducer.beginCandidateSweep(s, hint)
+        s = CandidateSweepSteps.begin(s, hint)
         assertEquals(GameState.Phase.Hinting, s.phase)
 
-        s = GameReducer.applyCandidateSweepFill(s)
+        s = CandidateSweepSteps.fill(s)
         // Every empty cell now carries 1..9 in the default color.
         for (i in 0 until 81) {
             val c = s.cells[i]
@@ -583,7 +583,7 @@ class GameReducerTest {
         }
 
         for (plan in hint.plan) {
-            s = GameReducer.advanceCandidateSweepCell(
+            s = CandidateSweepSteps.advance(
                 state = s,
                 currentCell = plan.cellIdx,
                 doomedDigits = plan.doomedDigits,
@@ -596,14 +596,14 @@ class GameReducerTest {
         assertTrue(7 !in cell01.pencilMarks.keys)
         assertTrue(8 !in cell01.pencilMarks.keys)
 
-        s = GameReducer.completeCandidateSweep(s, hint)
+        s = CandidateSweepSteps.complete(s, hint)
         assertEquals(GameState.Phase.Playing, s.phase)
         assertEquals(1, s.hintCount)
         assertTrue(s.history.last() is Move.PencilSweep)
 
         // Undo: every empty cell loses its candidates again (we started
         // with none) and no peer cell carries leftover notes.
-        s = GameReducer.undo(s)
+        s = BoardMoves.undo(s)
         for (i in 0 until 81) {
             assertTrue(s.cells[i].pencilMarks.isEmpty(), "cell $i should have no notes after undo")
         }
@@ -635,12 +635,12 @@ class GameReducerTest {
         val hint = HintEngine.findCandidateSweep(grid)
             ?: error("expected a sweep on this grid")
 
-        s = GameReducer.beginCandidateSweep(s, hint)
-        s = GameReducer.applyCandidateSweepFill(s)
+        s = CandidateSweepSteps.begin(s, hint)
+        s = CandidateSweepSteps.fill(s)
         for (plan in hint.plan) {
-            s = GameReducer.advanceCandidateSweepCell(s, plan.cellIdx, plan.doomedDigits, plan.eliminatorPeers)
+            s = CandidateSweepSteps.advance(s, plan.cellIdx, plan.doomedDigits, plan.eliminatorPeers)
         }
-        s = GameReducer.completeCandidateSweep(s, hint, countAsHint = false)
+        s = CandidateSweepSteps.complete(s, hint, countAsHint = false)
         assertEquals(0, s.hintCount)
         // The undo move is still recorded so the player can revert it.
         assertTrue(s.history.last() is Move.PencilSweep)
@@ -652,20 +652,20 @@ class GameReducerTest {
         val grid = IntArray(81) { i -> s0.cells[i].value ?: 0 }
         val hint = HintEngine.allNakedSingles(grid).first()
 
-        var s = GameReducer.setPendingHint(s0, hint, setOf(hint.targetCell))
+        var s = PendingHints.set(s0, hint, setOf(hint.targetCell))
         assertEquals(setOf(hint.targetCell), s.pendingHint?.keyCells)
         assertEquals(false, s.pendingHint?.showCells)
         assertEquals("Naked Single", s.pendingHint?.techniqueName)
 
-        s = GameReducer.advancePendingHintRevealCells(s)
+        s = PendingHints.revealCells(s)
         assertEquals(true, s.pendingHint?.showCells)
 
         // Second advance is a no-op once method is shown.
         val before = s
-        s = GameReducer.advancePendingHintRevealCells(s)
+        s = PendingHints.revealCells(s)
         assertSame(before, s)
 
-        s = GameReducer.clearPendingHint(s)
+        s = PendingHints.clear(s)
         assertNull(s.pendingHint)
     }
 
@@ -677,11 +677,11 @@ class GameReducerTest {
         val tr = hint.targetCell / 9
         val tc = hint.targetCell % 9
 
-        var s = GameReducer.setPendingHint(s0, hint, setOf(hint.targetCell))
+        var s = PendingHints.set(s0, hint, setOf(hint.targetCell))
         // Place any digit (correct or not) — the highlight should clear.
         val wrong = if (hint.solutionDigit == 1) 2 else 1
-        s = GameReducer.selectDigit(s, wrong)
-        s = GameReducer.tapCell(s, tr, tc)
+        s = BoardMoves.selectDigit(s, wrong)
+        s = BoardMoves.tapCell(s, tr, tc)
         assertEquals(wrong, s.cellAt(tr, tc).value)
         assertNull(s.pendingHint)
     }
@@ -701,27 +701,27 @@ class GameReducerTest {
 
         // 1. Value placement in any key cell.
         for (key in keys) {
-            var s = GameReducer.setPendingHint(s0, hint, keys)
-            s = GameReducer.selectDigit(s, 1)
-            s = GameReducer.tapCell(s, key / 9, key % 9)
+            var s = PendingHints.set(s0, hint, keys)
+            s = BoardMoves.selectDigit(s, 1)
+            s = BoardMoves.tapCell(s, key / 9, key % 9)
             assertNull(s.pendingHint, "value in key cell $key should clear")
         }
         // 2. Value placement in a non-key cell still clears.
-        var s = GameReducer.setPendingHint(s0, hint, keys)
-        s = GameReducer.selectDigit(s, 1)
-        s = GameReducer.tapCell(s, nonKey / 9, nonKey % 9)
+        var s = PendingHints.set(s0, hint, keys)
+        s = BoardMoves.selectDigit(s, 1)
+        s = BoardMoves.tapCell(s, nonKey / 9, nonKey % 9)
         assertNull(s.pendingHint, "value in a non-key cell must also clear")
         // 3. Pencil-mark toggle clears.
-        s = GameReducer.setPendingHint(s0, hint, keys)
-        s = GameReducer.togglePencil(s)
-        s = GameReducer.selectDigit(s, 1)
-        s = GameReducer.tapCell(s, nonKey / 9, nonKey % 9)
+        s = PendingHints.set(s0, hint, keys)
+        s = BoardMoves.togglePencil(s)
+        s = BoardMoves.selectDigit(s, 1)
+        s = BoardMoves.tapCell(s, nonKey / 9, nonKey % 9)
         assertNull(s.pendingHint, "pencil-mark toggle must clear the pending hint")
         // 4. Double-tap clear on a filled cell clears too.
-        s = initial().let { GameReducer.selectDigit(it, 4) }
-        s = GameReducer.tapCell(s, nonKey / 9, nonKey % 9) // fill it
-        s = GameReducer.setPendingHint(s, hint, keys)
-        s = GameReducer.doubleTapCell(s, nonKey / 9, nonKey % 9)
+        s = initial().let { BoardMoves.selectDigit(it, 4) }
+        s = BoardMoves.tapCell(s, nonKey / 9, nonKey % 9) // fill it
+        s = PendingHints.set(s, hint, keys)
+        s = BoardMoves.doubleTapCell(s, nonKey / 9, nonKey % 9)
         assertNull(s.pendingHint, "double-tap clear must clear the pending hint")
     }
 
@@ -731,20 +731,20 @@ class GameReducerTest {
         val grid = IntArray(81) { i -> s0.cells[i].value ?: 0 }
         val hint = HintEngine.allNakedSingles(grid).first()
 
-        var s = GameReducer.beginNakedSingleHint(s0, hint)
+        var s = NakedSingleSteps.begin(s0, hint)
         for (d in 1..9) {
-            s = GameReducer.advanceNakedSingleStep(
+            s = NakedSingleSteps.advance(
                 state = s,
                 activeDigit = d,
                 eliminatorCells = hint.eliminators[d].orEmpty(),
                 eliminate = d != hint.solutionDigit,
             )
         }
-        s = GameReducer.completeNakedSingleHint(s, hint)
+        s = NakedSingleSteps.complete(s, hint)
         assertEquals(hint, s.lastHint)
 
         // Undo pops the hint move but keeps lastHint set so Show Again works.
-        s = GameReducer.undo(s)
+        s = BoardMoves.undo(s)
         assertEquals(hint, s.lastHint)
     }
 
@@ -754,24 +754,24 @@ class GameReducerTest {
         val grid = IntArray(81) { i -> s0.cells[i].value ?: 0 }
         val hint = HintEngine.allNakedSingles(grid).first()
 
-        var s = GameReducer.beginNakedSingleHint(s0, hint)
+        var s = NakedSingleSteps.begin(s0, hint)
         for (d in 1..9) {
-            s = GameReducer.advanceNakedSingleStep(
+            s = NakedSingleSteps.advance(
                 state = s,
                 activeDigit = d,
                 eliminatorCells = hint.eliminators[d].orEmpty(),
                 eliminate = d != hint.solutionDigit,
             )
         }
-        s = GameReducer.completeNakedSingleHint(s, hint)
+        s = NakedSingleSteps.complete(s, hint)
         assertEquals(hint, s.lastHint)
 
         // Find any non-given empty cell and place a value there.
         val targetEmpty = (0 until 81).first {
             !s.cells[it].given && s.cells[it].value == null
         }
-        s = GameReducer.selectDigit(s, 1)
-        s = GameReducer.tapCell(s, targetEmpty / 9, targetEmpty % 9)
+        s = BoardMoves.selectDigit(s, 1)
+        s = BoardMoves.tapCell(s, targetEmpty / 9, targetEmpty % 9)
         assertNull(s.lastHint, "any cell change must clear lastHint")
     }
 
@@ -781,16 +781,16 @@ class GameReducerTest {
         val grid = IntArray(81) { i -> s0.cells[i].value ?: 0 }
         val hint = HintEngine.allNakedSingles(grid).first()
 
-        var s = GameReducer.beginNakedSingleHint(s0, hint)
+        var s = NakedSingleSteps.begin(s0, hint)
         for (d in 1..9) {
-            s = GameReducer.advanceNakedSingleStep(
+            s = NakedSingleSteps.advance(
                 state = s,
                 activeDigit = d,
                 eliminatorCells = hint.eliminators[d].orEmpty(),
                 eliminate = d != hint.solutionDigit,
             )
         }
-        s = GameReducer.completeNakedSingleHint(s, hint, countAsHint = false)
+        s = NakedSingleSteps.complete(s, hint, countAsHint = false)
         assertEquals(0, s.hintCount)
         assertEquals(hint, s.lastHint)
     }
@@ -798,13 +798,13 @@ class GameReducerTest {
     @Test
     fun `resetBoard returns to starting position`() {
         var s = initial()
-        s = GameReducer.selectDigit(s, 4)
-        s = GameReducer.tapCell(s, 0, 2)
-        s = GameReducer.togglePencil(s)
-        s = GameReducer.selectDigit(s, 7)
-        s = GameReducer.tapCell(s, 0, 3)
+        s = BoardMoves.selectDigit(s, 4)
+        s = BoardMoves.tapCell(s, 0, 2)
+        s = BoardMoves.togglePencil(s)
+        s = BoardMoves.selectDigit(s, 7)
+        s = BoardMoves.tapCell(s, 0, 3)
         assertTrue(s.history.isNotEmpty())
-        s = GameReducer.resetBoard(s)
+        s = BoardMoves.resetBoard(s)
         assertTrue(s.history.isEmpty())
         assertNull(s.cellAt(0, 2).value)
         assertNull(s.cellAt(0, 3).value)

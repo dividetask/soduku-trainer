@@ -11,7 +11,7 @@ data class GameState(
     val hintCount: Int = 0,
     val hintUi: HintUi? = null,
     val pendingHint: PendingHint? = null,
-    val lastHint: HintEngine.Hint? = null,
+    val lastHint: Hint? = null,
 ) {
     enum class Phase { Playing, AutoSolving, Celebrating, Hinting }
 

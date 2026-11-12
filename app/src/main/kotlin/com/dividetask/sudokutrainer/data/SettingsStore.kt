@@ -1,24 +1,9 @@
 package com.dividetask.sudokutrainer.data
 
 import android.content.Context
-import com.dividetask.sudokutrainer.domain.Difficulty
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-
-/** Player-facing options, chosen on the Settings screen. */
-data class Settings(
-    /** Difficulty for New Game. Null until the player picks one; there is no default. */
-    val difficulty: Difficulty? = null,
-    /** Run a Candidate Sweep when a game starts, filling in every note. */
-    val autofillCandidates: Boolean = true,
-    /** Animate how a hint reaches its answer; off applies it at once. */
-    val showHintWork: Boolean = true,
-    /** Reject (flash red and undo) a wrong value placed in the Solve color. */
-    val preventIncorrectValues: Boolean = true,
-    /** Reject a Solve-color note that contradicts the solution. */
-    val preventIncorrectNotes: Boolean = true,
-)
 
 /** Persists [Settings] and whether the first-run settings screen was seen. */
 class SettingsStore(context: Context) {

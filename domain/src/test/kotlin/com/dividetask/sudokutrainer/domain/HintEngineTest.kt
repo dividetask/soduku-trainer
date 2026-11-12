@@ -54,8 +54,8 @@ class HintEngineTest {
             }.toSet()
         }
         val hint = HintEngine.find(grid, marks)
-        assertTrue(hint is HintEngine.NoteSingle, "expected NoteSingle, got $hint")
-        hint as HintEngine.NoteSingle
+        assertTrue(hint is Hint.NoteSingle, "expected NoteSingle, got $hint")
+        hint as Hint.NoteSingle
         assertEquals(0, hint.targetCell)
         assertEquals(5, hint.solutionDigit)
     }
@@ -76,7 +76,7 @@ class HintEngineTest {
             }
         }
         val hint = HintEngine.find(grid, marks)
-        assertFalse(hint is HintEngine.NoteSingle,
+        assertFalse(hint is Hint.NoteSingle,
             "engine must not return NoteSingle when the lone mark is illegal")
     }
 
@@ -86,8 +86,8 @@ class HintEngineTest {
         // is itself work — CandidateSweep with initialFill = true.
         val grid = IntArray(81)
         val hint = HintEngine.find(grid)
-        assertTrue(hint is HintEngine.CandidateSweep)
-        hint as HintEngine.CandidateSweep
+        assertTrue(hint is Hint.CandidateSweep)
+        hint as Hint.CandidateSweep
         assertTrue(hint.initialFill)
         assertTrue(hint.plan.isEmpty(), "no givens means no eliminations")
     }
@@ -104,11 +104,11 @@ class HintEngineTest {
 
         val hint = HintEngine.find(grid)
         assertNotNull(hint)
-        hint as HintEngine.HiddenSingle
+        hint as Hint.HiddenSingle
         assertEquals(0, hint.targetCell)
         assertEquals(5, hint.solutionDigit)
         assertEquals("Hidden Single", hint.techniqueName)
-        assertEquals(HintEngine.UnitKind.Box, hint.unit.kind)
+        assertEquals(Hint.UnitKind.Box, hint.unit.kind)
         // Every other empty cell in the unit must report at least one peer
         // outside the unit holding the digit.
         for (cellIdx in hint.unit.cells) {
@@ -132,7 +132,7 @@ class HintEngineTest {
 
         assertTrue(HintEngine.allNakedSingles(grid).isNotEmpty())
         val hint = HintEngine.find(grid)
-        assertTrue(hint is HintEngine.HiddenSingle, "expected HiddenSingle, got $hint")
+        assertTrue(hint is Hint.HiddenSingle, "expected HiddenSingle, got $hint")
     }
 
     @Test
@@ -142,11 +142,11 @@ class HintEngineTest {
         val grid = IntArray(81)
         for (idx in givenIndices) grid[idx] = solution[idx]
         val hint = HintEngine.find(grid)
-        assertTrue(hint is HintEngine.HiddenSingle, "expected HiddenSingle, got $hint")
-        hint as HintEngine.HiddenSingle
+        assertTrue(hint is Hint.HiddenSingle, "expected HiddenSingle, got $hint")
+        hint as Hint.HiddenSingle
         assertEquals(0, hint.targetCell)
         assertEquals(5, hint.solutionDigit)
-        assertEquals(HintEngine.UnitKind.Box, hint.unit.kind)
+        assertEquals(Hint.UnitKind.Box, hint.unit.kind)
     }
 
     @Test
@@ -158,8 +158,8 @@ class HintEngineTest {
         val grid = IntArray(81)
         for (idx in givenIndices) grid[idx] = solution[idx]
         val hint = HintEngine.find(grid)
-        assertTrue(hint is HintEngine.HiddenSingle, "expected HiddenSingle, got $hint")
-        hint as HintEngine.HiddenSingle
+        assertTrue(hint is Hint.HiddenSingle, "expected HiddenSingle, got $hint")
+        hint as Hint.HiddenSingle
         assertEquals(0, hint.targetCell)
         assertEquals(5, hint.solutionDigit)
     }
@@ -174,8 +174,8 @@ class HintEngineTest {
         grid[1 * 9 + 1] = 7; grid[1 * 9 + 2] = 8
         assertTrue(HintEngine.allHiddenSingles(grid).isEmpty(), "board has a hidden single")
         val hint = HintEngine.find(grid)
-        assertTrue(hint is HintEngine.NakedSingle, "expected NakedSingle, got $hint")
-        hint as HintEngine.NakedSingle
+        assertTrue(hint is Hint.NakedSingle, "expected NakedSingle, got $hint")
+        hint as Hint.NakedSingle
         assertEquals(0, hint.targetCell)
         assertEquals(9, hint.solutionDigit)
     }
@@ -202,8 +202,8 @@ class HintEngineTest {
         grid[2 * 9 + 2] = 8
 
         val hint = HintEngine.find(grid)
-        assertTrue(hint is HintEngine.CandidateSweep, "expected CandidateSweep, got $hint")
-        hint as HintEngine.CandidateSweep
+        assertTrue(hint is Hint.CandidateSweep, "expected CandidateSweep, got $hint")
+        hint as Hint.CandidateSweep
         assertTrue(hint.initialFill)
         assertTrue(hint.plan.isNotEmpty())
         // Sanity: (0,1) should lose 5 (row 0), 7 (col 1 + box 0), 8 (box 0).
@@ -242,7 +242,7 @@ class HintEngineTest {
         val grid = IntArray(81)
         for (idx in givenIndices) grid[idx] = solution[idx]
         val hint = HintEngine.find(grid)
-        assertTrue(hint is HintEngine.CandidateSweep)
+        assertTrue(hint is Hint.CandidateSweep)
     }
 
     @Test
@@ -262,8 +262,8 @@ class HintEngineTest {
         }
 
         val first = HintEngine.find(grid, marks)
-        assertTrue(first is HintEngine.NakedPair, "expected NakedPair, got $first")
-        first as HintEngine.NakedPair
+        assertTrue(first is Hint.NakedPair, "expected NakedPair, got $first")
+        first as Hint.NakedPair
 
         // Apply the pair's eliminations to the player marks.
         for (step in first.plan) {
@@ -272,7 +272,7 @@ class HintEngineTest {
 
         // The same Naked Pair must not be returned again.
         val second = HintEngine.find(grid, marks)
-        if (second is HintEngine.NakedPair) {
+        if (second is Hint.NakedPair) {
             assertTrue(second.keyCells != first.keyCells,
                 "engine should not re-emit the same Naked Pair after its plan is applied")
         }
@@ -288,7 +288,7 @@ class HintEngineTest {
     private fun assertTechniqueGridReturns(
         techniqueName: String,
         givenIndices: IntArray,
-        check: (HintEngine.Hint) -> Boolean,
+        check: (Hint) -> Boolean,
     ) {
         val grid = IntArray(81)
         for (idx in givenIndices) grid[idx] = CANONICAL_SOLUTION[idx]
@@ -310,7 +310,7 @@ class HintEngineTest {
                 7, 8, 12, 16, 18, 22, 24, 28, 29, 31, 39, 42, 46, 47, 52, 53,
                 54, 56, 58, 60, 62, 63, 65, 66, 67, 70, 71, 74, 75, 78, 79,
             ),
-        ) { it is HintEngine.NakedPair }
+        ) { it is Hint.NakedPair }
     }
 
     @Test
@@ -321,7 +321,7 @@ class HintEngineTest {
                 8, 12, 16, 19, 20, 21, 23, 24, 25, 30, 33, 40, 45, 48, 50,
                 53, 55, 56, 61, 63, 67, 69, 71, 74, 77, 78,
             ),
-        ) { it is HintEngine.HiddenPair }
+        ) { it is Hint.HiddenPair }
     }
 
     @Test
@@ -332,7 +332,7 @@ class HintEngineTest {
                 3, 4, 6, 10, 14, 24, 29, 33, 36, 37, 38, 43, 44, 45, 47, 52,
                 53, 56, 65, 66, 67, 68, 69, 71, 78, 80,
             ),
-        ) { it is HintEngine.PointingPair }
+        ) { it is Hint.PointingPair }
     }
 
     @Test
@@ -343,7 +343,7 @@ class HintEngineTest {
                 18, 19, 20, 22, 24, 27, 32, 33, 34, 35, 37, 42, 52, 53, 57,
                 62, 65, 69, 70, 72, 77,
             ),
-        ) { it is HintEngine.BoxLineReduction }
+        ) { it is Hint.BoxLineReduction }
     }
 
     @Test
@@ -354,7 +354,7 @@ class HintEngineTest {
                 0, 2, 10, 13, 16, 17, 19, 22, 28, 32, 33, 41, 44, 47, 48, 49,
                 54, 62, 63, 74, 78,
             ),
-        ) { it is HintEngine.NakedTriple }
+        ) { it is Hint.NakedTriple }
     }
 
     @Test
@@ -364,7 +364,7 @@ class HintEngineTest {
             intArrayOf(
                 6, 7, 13, 23, 37, 40, 42, 43, 51, 65, 69, 70, 71, 72, 74, 79,
             ),
-        ) { it is HintEngine.HiddenTriple }
+        ) { it is Hint.HiddenTriple }
     }
 
     @Test
@@ -375,7 +375,7 @@ class HintEngineTest {
                 0, 1, 10, 12, 14, 16, 20, 21, 26, 28, 32, 46, 49, 51, 64, 65,
                 68, 70, 75, 77, 79,
             ),
-        ) { it is HintEngine.XWing }
+        ) { it is Hint.XWing }
     }
 
     @Test
@@ -386,7 +386,7 @@ class HintEngineTest {
                 2, 5, 6, 10, 11, 15, 16, 24, 28, 35, 37, 39, 42, 44, 52, 55,
                 57, 60, 62, 67, 70, 71, 73, 74, 76, 78, 79,
             ),
-        ) { it is HintEngine.XYWing }
+        ) { it is Hint.XYWing }
     }
 
     @Test
@@ -406,8 +406,8 @@ class HintEngineTest {
         val marks = Array<Set<Int>>(81) { emptySet() }
         for (idx in empties) marks[idx] = setOf(4)
 
-        val cands = HintEngine.candidateGrid(grid, marks)
-        val hint = HintEngine.findEmptyRectangle(grid, cands)
+        val cands = Candidates.of(grid, marks)
+        val hint = EmptyRectangleFinder.find(grid, cands)
 
         assertNotNull(hint, "ER finder returned null on the worked example")
         hint!!

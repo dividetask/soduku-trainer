@@ -13,7 +13,7 @@ package com.dividetask.sudokutrainer.domain
  * any board-changing action, or when the game phase changes.
  */
 data class PendingHint(
-    val hint: HintEngine.Hint,
+    val hint: Hint,
     val keyCells: Set<Int>,
     val techniqueName: String,
     val showCells: Boolean = false,

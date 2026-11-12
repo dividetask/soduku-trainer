@@ -7,15 +7,16 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.dividetask.sudokutrainer.data.GameConfig
 import com.dividetask.sudokutrainer.data.PuzzleRepository
 import com.dividetask.sudokutrainer.data.SettingsStore
-import com.dividetask.sudokutrainer.domain.GameReducer
+import com.dividetask.sudokutrainer.domain.BoardMoves
+import com.dividetask.sudokutrainer.domain.PendingHints
 import com.dividetask.sudokutrainer.domain.GameState
 import com.dividetask.sudokutrainer.domain.GuessColor
-import com.dividetask.sudokutrainer.domain.HintEngine
-import com.dividetask.sudokutrainer.domain.HintUi
+import com.dividetask.sudokutrainer.domain.Hint
 import com.dividetask.sudokutrainer.domain.TrainerDrill
 import com.dividetask.sudokutrainer.domain.TrainerGenerator
 import com.dividetask.sudokutrainer.domain.TrainerJudge
 import com.dividetask.sudokutrainer.domain.TrainerMethod
+import com.dividetask.sudokutrainer.ui.game.BoardOverlays
 import com.dividetask.sudokutrainer.ui.game.HintAnimator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -55,6 +56,14 @@ class TrainerViewModel(
 
     private var drill: TrainerDrill? = null
     private var advanceJob: Job? = null
+
+    private val overlays = BoardOverlays(
+        scope = viewModelScope,
+        flashMs = { config.hintFlashMs },
+        mistakesMs = { config.pendingHintMs },
+        get = { _state.value },
+        set = { _state.value = it },
+    )
 
     private val animator = HintAnimator(
         scope = viewModelScope,
@@ -131,9 +140,9 @@ class TrainerViewModel(
         _state.value = transform(s)
     }
 
-    fun onDigitSelected(digit: Int) = update { GameReducer.selectDigit(it, digit) }
-    fun onPencilToggled() = update { GameReducer.togglePencil(it) }
-    fun onColorSelected(color: GuessColor) = update { GameReducer.selectColor(it, color) }
+    fun onDigitSelected(digit: Int) = update { BoardMoves.selectDigit(it, digit) }
+    fun onPencilToggled() = update { BoardMoves.togglePencil(it) }
+    fun onColorSelected(color: GuessColor) = update { BoardMoves.selectColor(it, color) }
     /**
      * Undo. During the pause after a solved drill it also cancels the
      * move to the next drill, so the player can look again (and press
@@ -145,11 +154,11 @@ class TrainerViewModel(
             _solvedByHint.value = false
             _status.value = Status.Playing
         }
-        update { GameReducer.undo(it) }
+        update { BoardMoves.undo(it) }
     }
 
-    fun onCellTapped(row: Int, col: Int) = playerMove { GameReducer.tapCell(it, row, col) }
-    fun onCellDoubleTapped(row: Int, col: Int) = playerMove { GameReducer.doubleTapCell(it, row, col) }
+    fun onCellTapped(row: Int, col: Int) = playerMove { BoardMoves.tapCell(it, row, col) }
+    fun onCellDoubleTapped(row: Int, col: Int) = playerMove { BoardMoves.doubleTapCell(it, row, col) }
 
     /** Apply a move unless it isn't one the method makes; then flash red instead. */
     private fun playerMove(transform: (GameState) -> GameState) {
@@ -159,11 +168,7 @@ class TrainerViewModel(
         val next = transform(s)
         if (next === s) return
         if (TrainerJudge.judge(d, next) == TrainerJudge.Verdict.Wrong) {
-            _state.value = s.copy(hintUi = HintUi.ErrorFlash)
-            viewModelScope.launch {
-                delay(config.hintFlashMs)
-                update { if (it.hintUi == HintUi.ErrorFlash) it.copy(hintUi = null) else it }
-            }
+            overlays.flashError()
             return
         }
         _state.value = next
@@ -183,18 +188,18 @@ class TrainerViewModel(
         if (_status.value != Status.Playing || s.phase != GameState.Phase.Playing) return
         val pending = s.pendingHint
         if (pending != null) {
-            _state.value = GameReducer.clearPendingHint(s)
+            _state.value = PendingHints.clear(s)
             animator.run(pending.hint, settingsStore.settings.value.showHintWork)
             return
         }
         val hint = TrainerJudge.hintFor(d, s) ?: return
         val keyCells = when (hint) {
-            is HintEngine.NakedSingle -> setOf(hint.targetCell)
-            is HintEngine.HiddenSingle -> setOf(hint.targetCell)
-            is HintEngine.EliminationHint -> hint.keyCells
+            is Hint.NakedSingle -> setOf(hint.targetCell)
+            is Hint.HiddenSingle -> setOf(hint.targetCell)
+            is Hint.EliminationHint -> hint.keyCells
             else -> emptySet()
         }
-        _state.value = GameReducer.advancePendingHintRevealCells(GameReducer.setPendingHint(s, hint, keyCells))
+        _state.value = PendingHints.revealCells(PendingHints.set(s, hint, keyCells))
     }
 
     companion object {

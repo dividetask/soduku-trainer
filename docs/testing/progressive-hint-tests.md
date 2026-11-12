@@ -19,7 +19,7 @@ Candidate Sweep through the Hint button does **not** use this flow
 
 ## Tests
 
-All in `GameReducerTest.kt`. The timer behavior lives in
+All in `BoardMovesAndHintStepsTest.kt`. The timer behavior lives in
 `GameViewModel` and isn't reducer-testable, so these focus on the
 reducer-side state transitions.
 

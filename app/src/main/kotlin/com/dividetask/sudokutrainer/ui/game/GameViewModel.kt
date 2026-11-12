@@ -9,32 +9,27 @@ import com.dividetask.sudokutrainer.data.PuzzleRepository
 import com.dividetask.sudokutrainer.data.SavedGameStore
 import com.dividetask.sudokutrainer.data.Settings
 import com.dividetask.sudokutrainer.data.SettingsStore
+import com.dividetask.sudokutrainer.domain.BoardMoves
 import com.dividetask.sudokutrainer.domain.Difficulty
 import com.dividetask.sudokutrainer.domain.EntryCheck
-import com.dividetask.sudokutrainer.domain.GameReducer
 import com.dividetask.sudokutrainer.domain.GameState
 import com.dividetask.sudokutrainer.domain.GuessColor
-import com.dividetask.sudokutrainer.domain.HintEngine
-import com.dividetask.sudokutrainer.domain.HintUi
-import com.dividetask.sudokutrainer.domain.Move
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 
 /**
- * Drives one game. [difficulty] picks a new puzzle; when [resume] is set
- * the saved game is loaded instead (falling back to a new puzzle if the
- * save can't be read).
+ * Drives one game by wiring the game's parts together: player moves (and
+ * the "prevent incorrect" checks), [HintFlow], [StartingSweep],
+ * [AutoSolver], [GameSaver] and [BoardOverlays]. [difficulty] picks a new
+ * puzzle; when [resume] is set the saved game is loaded instead (falling
+ * back to a new puzzle if the save can't be read).
  */
 class GameViewModel(
-    private val repository: PuzzleRepository,
+    repository: PuzzleRepository,
     private val config: GameConfig,
     private val settingsStore: SettingsStore,
-    private val savedGames: SavedGameStore,
+    savedGames: SavedGameStore,
     difficulty: Difficulty,
     resume: Boolean,
 ) : ViewModel() {
@@ -43,141 +38,90 @@ class GameViewModel(
 
     private val resumed: GameState? = if (resume) savedGames.load() else null
 
-    private val _state: MutableStateFlow<GameState> = MutableStateFlow(
-        resumed ?: GameState.forNewGame(repository.pickRandom(difficulty))
-    )
-    val state: StateFlow<GameState> = _state.asStateFlow()
+    private val board = BoardStore(resumed ?: GameState.forNewGame(repository.pickRandom(difficulty)))
+    val state: StateFlow<GameState> = board.flow
 
     private val _exitSignal = MutableStateFlow(false)
     val exitSignal: StateFlow<Boolean> = _exitSignal.asStateFlow()
+
+    val gameConfig: GameConfig get() = config
 
     private val animator = HintAnimator(
         scope = viewModelScope,
         stepDelayMs = { config.hintStepMs },
         sweepCellMs = { config.sweepCellMs },
-        getState = { _state.value },
-        setState = { _state.value = it },
+        getState = { board.value },
+        setState = { board.value = it },
     )
-
-    // Declared before init: a resumed, nearly finished game starts its
-    // auto-solve from init, and a later initializer would reset this.
-    @Volatile private var autoSolveStarted: Boolean = false
+    private val overlays = BoardOverlays(
+        scope = viewModelScope,
+        flashMs = { config.hintFlashMs },
+        mistakesMs = { config.pendingHintMs },
+        get = { board.value },
+        set = { board.value = it },
+    )
+    private val hints = HintFlow(
+        scope = viewModelScope,
+        board = board,
+        animator = animator,
+        overlays = overlays,
+        pendingHintMs = { config.pendingHintMs },
+        showAgainMultiplier = { config.showAgainMultiplier },
+        showWork = { settings.showHintWork },
+    )
+    private val startingSweep = StartingSweep(viewModelScope, board, animator)
+    private val autoSolver = AutoSolver(
+        scope = viewModelScope,
+        solveCriteria = { config.solveCriteria },
+        cellDelayMs = { config.solveSpeed },
+        celebrationMs = { config.fireworkDuration },
+        board = board,
+        onFinished = { _exitSignal.value = true },
+    )
+    private val saver = GameSaver(savedGames, isFinishing = { autoSolver.started })
 
     init {
-        if (resumed == null) runStartingSweep()
-
-        // Keep the saved game in step with the board, for Resume. The
-        // collector runs in order, so a later state is never overwritten
-        // by an earlier one. Mid-hint frames are skipped; a finished game
-        // is no longer resumable.
-        viewModelScope.launch(Dispatchers.IO) {
-            _state.collect { s ->
-                when (s.phase) {
-                    GameState.Phase.Playing -> if (!autoSolveStarted) savedGames.save(s)
-                    GameState.Phase.AutoSolving, GameState.Phase.Celebrating -> savedGames.clear()
-                    GameState.Phase.Hinting -> Unit
-                }
-            }
-        }
-
-        // Auto-trigger solve when the board has few enough empty cells
-        // — fires once, regardless of correctness of placed values.
-        viewModelScope.launch {
-            _state.collect { s ->
-                if (!autoSolveStarted &&
-                    s.phase == GameState.Phase.Playing &&
-                    s.isMostlySolved(config.solveCriteria)
-                ) {
-                    onSolve()
-                }
-            }
-        }
+        if (resumed == null) startingSweep.run(settings.autofillCandidates, settings.showHintWork)
+        saver.watch(viewModelScope, board.flow)
+        autoSolver.watch()
     }
 
-
     fun onDigitSelected(digit: Int) {
-        _state.value = GameReducer.selectDigit(_state.value, digit)
+        board.value = BoardMoves.selectDigit(board.value, digit)
     }
 
     fun onPencilToggled() {
-        _state.value = GameReducer.togglePencil(_state.value)
+        board.value = BoardMoves.togglePencil(board.value)
     }
 
     fun onColorSelected(color: GuessColor) {
-        _state.value = GameReducer.selectColor(_state.value, color)
+        board.value = BoardMoves.selectColor(board.value, color)
     }
 
     fun onCellTapped(row: Int, col: Int) {
-        applyPlayerMove(GameReducer.tapCell(_state.value, row, col))
-    }
-
-    /** Commit [next] unless the "prevent incorrect" settings forbid the move. */
-    private fun applyPlayerMove(next: GameState) {
-        clearMistakes()
-        val before = _state.value
-        val s = settings
-        if (EntryCheck.isForbidden(before, next, s.preventIncorrectValues, s.preventIncorrectNotes)) {
-            flashError()
-            return
-        }
-        // [next] was built before clearMistakes(), so carry over the
-        // current overlay rather than its stale one.
-        _state.value = next.copy(hintUi = _state.value.hintUi)
-    }
-
-    /** Flash the board red; the rejected move is never applied. */
-    private fun flashError() {
-        _state.value = _state.value.copy(hintUi = HintUi.ErrorFlash)
-        viewModelScope.launch {
-            delay(config.hintFlashMs)
-            if (_state.value.hintUi == HintUi.ErrorFlash) {
-                _state.value = _state.value.copy(hintUi = null)
-            }
-        }
-    }
-
-    /**
-     * With "autofill starting candidates" on, open the game as if Sweep
-     * were pressed — animated or not per "show work". The sweep becomes
-     * part of the starting position, so Undo doesn't take the notes away.
-     */
-    private fun runStartingSweep() {
-        if (!settings.autofillCandidates) return
-        val s = _state.value
-        val grid = IntArray(81) { i -> s.cells[i].value ?: 0 }
-        val marks = Array(81) { i -> s.cells[i].pencilMarks.keys.toSet() }
-        val sweep = HintEngine.findCandidateSweep(grid, marks) ?: return
-        val job = animator.run(sweep, settings.showHintWork, countAsHint = false)
-        if (job == null) {
-            forgetStartingSweep()
-        } else {
-            viewModelScope.launch { job.join(); forgetStartingSweep() }
-        }
-    }
-
-    private fun forgetStartingSweep() {
-        val s = _state.value
-        if (s.history.size == 1 && s.history[0] is Move.PencilSweep) {
-            _state.value = s.copy(history = emptyList(), lastHint = null)
-        }
+        applyPlayerMove(BoardMoves.tapCell(board.value, row, col))
     }
 
     fun onCellDoubleTapped(row: Int, col: Int) {
-        clearMistakes()
-        _state.value = GameReducer.doubleTapCell(_state.value, row, col)
+        overlays.clearMistakes()
+        board.value = BoardMoves.doubleTapCell(board.value, row, col)
     }
 
     fun onUndo() {
-        clearMistakes()
-        _state.value = GameReducer.undo(_state.value)
+        overlays.clearMistakes()
+        board.value = BoardMoves.undo(board.value)
     }
 
     fun onClear() {
-        if (_state.value.phase != GameState.Phase.Playing) return
-        clearMistakes()
-        _state.value = GameReducer.resetBoard(_state.value)
-        runStartingSweep()
+        if (board.value.phase != GameState.Phase.Playing) return
+        overlays.clearMistakes()
+        board.value = BoardMoves.resetBoard(board.value)
+        startingSweep.run(settings.autofillCandidates, settings.showHintWork)
     }
+
+    fun onHint() = hints.onHint()
+
+    fun onShowAgain() = hints.onShowAgain()
 
     /**
      * Leave for the main menu. The game is saved first (finishing any
@@ -185,150 +129,22 @@ class GameViewModel(
      */
     fun onMainMenu() {
         if (animator.isRunning) animator.skip()
-        val s = _state.value
-        if (s.phase == GameState.Phase.Playing && !autoSolveStarted) {
-            savedGames.save(s.copy(hintUi = null, pendingHint = null))
-        }
+        saver.saveNow(board.value)
         _exitSignal.value = true
     }
 
-    val gameConfig: GameConfig get() = config
-
-    fun onSolve() {
-        if (autoSolveStarted) return
-        autoSolveStarted = true
-        _state.value = GameReducer.beginAutoSolve(_state.value)
-        viewModelScope.launch {
-            while (_state.value.emptyCellCount > 0) {
-                delay(config.solveSpeed)
-                _state.value = GameReducer.solveSingleCell(_state.value)
-            }
-            _state.value = _state.value.copy(phase = GameState.Phase.Celebrating)
-            delay(config.fireworkDuration)
-            _exitSignal.value = true
-        }
-    }
-
-    fun onShowAgain() {
-        val s = _state.value
-        if (s.phase != GameState.Phase.Playing) return
-        if (animator.isRunning) return
-        val hint = s.lastHint ?: return
-        // If the last history entry is still the hint's own move, undo
-        // it so the animation has something to apply. (If the player
-        // already pressed Undo manually, the hint isn't on the board
-        // anymore — just re-apply.)
-        val needsUndo = hintMatchesTopOfHistory(s, hint)
-        val base = if (needsUndo) GameReducer.undo(s) else s
-        _state.value = base.copy(lastHint = hint)
-        animator.launch(
-            hint = hint,
-            countAsHint = false,
-            speedMultiplier = config.showAgainMultiplier,
-        )
-    }
-
-    private fun hintMatchesTopOfHistory(state: GameState, hint: HintEngine.Hint): Boolean {
-        val last = state.history.lastOrNull() ?: return false
-        return when (hint) {
-            is HintEngine.NakedSingle, is HintEngine.HiddenSingle -> last is Move.SetValue
-            else -> last is Move.PencilSweep
-        }
-    }
-
-    private var pendingHintJob: Job? = null
-
-    fun onHint() {
-        val s = _state.value
-        // Pressing Hint while an animation is in flight skips to the
-        // final placement.
-        if (animator.isRunning) {
-            animator.skip()
+    /** Commit [next] unless the "prevent incorrect" settings forbid the move. */
+    private fun applyPlayerMove(next: GameState) {
+        overlays.clearMistakes()
+        val before = board.value
+        val s = settings
+        if (EntryCheck.isForbidden(before, next, s.preventIncorrectValues, s.preventIncorrectNotes)) {
+            overlays.flashError()
             return
         }
-        if (s.phase != GameState.Phase.Playing) return
-        if (s.hintUi != null) return
-
-        // Stage 2 or 3: a pending hint already exists from a prior press.
-        val ph = s.pendingHint
-        if (ph != null) {
-            if (!ph.showCells) {
-                _state.value = GameReducer.advancePendingHintRevealCells(s)
-                startPendingHintTimer()
-            } else {
-                // Stage 3: clear the pending hint and run the animation.
-                pendingHintJob?.cancel()
-                _state.value = GameReducer.clearPendingHint(s)
-                animator.run(ph.hint, settings.showHintWork)
-            }
-            return
-        }
-
-        // Stage 1: find a new hint. A board with mistakes (wrong values,
-        // or notes missing the answer) would mislead the engine, so show
-        // the mistakes in red instead.
-        val mistakes = s.mistakeCells()
-        if (mistakes.isNotEmpty()) {
-            _state.value = s.copy(hintUi = HintUi.Mistakes(mistakes))
-            mistakesJob?.cancel()
-            mistakesJob = viewModelScope.launch {
-                delay(config.pendingHintMs)
-                clearMistakes()
-            }
-            return
-        }
-        val grid = IntArray(81) { i -> s.cells[i].value ?: 0 }
-        val marks = Array(81) { i -> s.cells[i].pencilMarks.keys.toSet() }
-        val hint = HintEngine.find(grid, marks)
-
-        when (hint) {
-            null -> {
-                _state.value = s.copy(hintUi = HintUi.NoHintFlash)
-                viewModelScope.launch {
-                    delay(config.hintFlashMs)
-                    _state.value = _state.value.copy(hintUi = null)
-                }
-            }
-            is HintEngine.NakedSingle -> {
-                _state.value = GameReducer.setPendingHint(s, hint, setOf(hint.targetCell))
-                startPendingHintTimer()
-            }
-            is HintEngine.HiddenSingle -> {
-                _state.value = GameReducer.setPendingHint(s, hint, setOf(hint.targetCell))
-                startPendingHintTimer()
-            }
-            is HintEngine.NoteSingle -> {
-                _state.value = GameReducer.setPendingHint(s, hint, setOf(hint.targetCell))
-                startPendingHintTimer()
-            }
-            is HintEngine.CandidateSweep -> {
-                // No single target cell, so no progressive flow — apply now.
-                animator.run(hint, settings.showHintWork)
-            }
-            is HintEngine.EliminationHint -> {
-                _state.value = GameReducer.setPendingHint(s, hint, hint.keyCells)
-                startPendingHintTimer()
-            }
-        }
-    }
-
-    private var mistakesJob: Job? = null
-
-    /** Take down the red mistake highlight, if it's showing. */
-    private fun clearMistakes() {
-        if (_state.value.hintUi is HintUi.Mistakes) {
-            _state.value = _state.value.copy(hintUi = null)
-        }
-    }
-
-    private fun startPendingHintTimer() {
-        pendingHintJob?.cancel()
-        pendingHintJob = viewModelScope.launch {
-            delay(config.pendingHintMs)
-            if (_state.value.pendingHint != null) {
-                _state.value = GameReducer.clearPendingHint(_state.value)
-            }
-        }
+        // [next] was built before clearMistakes(), so carry over the
+        // current overlay rather than its stale one.
+        board.value = next.copy(hintUi = board.value.hintUi)
     }
 
     companion object {

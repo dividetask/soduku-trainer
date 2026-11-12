@@ -1,8 +1,12 @@
 package com.dividetask.sudokutrainer.ui.game
 
-import com.dividetask.sudokutrainer.domain.GameReducer
+import com.dividetask.sudokutrainer.domain.CandidateSweepSteps
+import com.dividetask.sudokutrainer.domain.EliminationSteps
+import com.dividetask.sudokutrainer.domain.HiddenSingleSteps
+import com.dividetask.sudokutrainer.domain.NakedSingleSteps
+import com.dividetask.sudokutrainer.domain.NoteSingleSteps
 import com.dividetask.sudokutrainer.domain.GameState
-import com.dividetask.sudokutrainer.domain.HintEngine
+import com.dividetask.sudokutrainer.domain.Hint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -24,7 +28,7 @@ class HintAnimator(
     private val setState: (GameState) -> Unit,
 ) {
 
-    @Volatile private var pending: HintEngine.Hint? = null
+    @Volatile private var pending: Hint? = null
     @Volatile private var pendingCountAsHint: Boolean = true
     @Volatile private var pendingSpeedMultiplier: Float = 1f
     private var job: Job? = null
@@ -43,7 +47,7 @@ class HintAnimator(
      * (Show Again).
      */
     fun launch(
-        hint: HintEngine.Hint,
+        hint: Hint,
         countAsHint: Boolean = true,
         speedMultiplier: Float = 1f,
     ): Job? {
@@ -54,11 +58,11 @@ class HintAnimator(
         val j = scope.launch {
             try {
                 when (hint) {
-                    is HintEngine.NakedSingle -> runNakedSingle(hint, countAsHint)
-                    is HintEngine.HiddenSingle -> runHiddenSingle(hint, countAsHint)
-                    is HintEngine.NoteSingle -> runNoteSingle(hint, countAsHint)
-                    is HintEngine.CandidateSweep -> runCandidateSweep(hint, countAsHint)
-                    is HintEngine.EliminationHint -> runEliminationHint(hint, countAsHint)
+                    is Hint.NakedSingle -> runNakedSingle(hint, countAsHint)
+                    is Hint.HiddenSingle -> runHiddenSingle(hint, countAsHint)
+                    is Hint.NoteSingle -> runNoteSingle(hint, countAsHint)
+                    is Hint.CandidateSweep -> runCandidateSweep(hint, countAsHint)
+                    is Hint.EliminationHint -> runEliminationHint(hint, countAsHint)
                 }
             } finally {
                 if (pending === hint) pending = null
@@ -85,23 +89,23 @@ class HintAnimator(
      * when the player has turned off "show work when giving hint". No-op
      * while an animation is running.
      */
-    fun applyInstantly(hint: HintEngine.Hint, countAsHint: Boolean = true) {
+    fun applyInstantly(hint: Hint, countAsHint: Boolean = true) {
         if (pending != null) return
         val s = getState()
         // The completion steps read the snapshot their begin step takes
         // (for undo), so begin first, then finish in the same frame.
         val begun = when (hint) {
-            is HintEngine.NakedSingle -> GameReducer.beginNakedSingleHint(s, hint)
-            is HintEngine.HiddenSingle -> GameReducer.beginHiddenSingleHint(s, hint)
-            is HintEngine.NoteSingle -> GameReducer.beginNoteSingleHint(s, hint)
-            is HintEngine.CandidateSweep -> GameReducer.beginCandidateSweep(s, hint)
-            is HintEngine.EliminationHint -> GameReducer.beginEliminationHint(s, hint)
+            is Hint.NakedSingle -> NakedSingleSteps.begin(s, hint)
+            is Hint.HiddenSingle -> HiddenSingleSteps.begin(s, hint)
+            is Hint.NoteSingle -> NoteSingleSteps.begin(s, hint)
+            is Hint.CandidateSweep -> CandidateSweepSteps.begin(s, hint)
+            is Hint.EliminationHint -> EliminationSteps.begin(s, hint)
         }
         setState(complete(begun, hint, countAsHint))
     }
 
     /** [launch] when [showWork] is set, otherwise [applyInstantly]. Returns the animation's job, if any. */
-    fun run(hint: HintEngine.Hint, showWork: Boolean, countAsHint: Boolean = true): Job? =
+    fun run(hint: Hint, showWork: Boolean, countAsHint: Boolean = true): Job? =
         if (showWork) {
             launch(hint, countAsHint)
         } else {
@@ -118,45 +122,45 @@ class HintAnimator(
     /** Apply every remaining step of [hint] and finish it, idempotently. */
     private fun complete(
         state: GameState,
-        hint: HintEngine.Hint,
+        hint: Hint,
         countAsHint: Boolean,
     ): GameState = when (hint) {
-        is HintEngine.NakedSingle -> GameReducer.completeNakedSingleHint(state, hint, countAsHint = countAsHint)
-        is HintEngine.HiddenSingle -> GameReducer.completeHiddenSingleHint(state, hint, countAsHint = countAsHint)
-        is HintEngine.NoteSingle -> GameReducer.completeNoteSingleHint(state, hint, countAsHint = countAsHint)
-        is HintEngine.CandidateSweep -> {
+        is Hint.NakedSingle -> NakedSingleSteps.complete(state, hint, countAsHint = countAsHint)
+        is Hint.HiddenSingle -> HiddenSingleSteps.complete(state, hint, countAsHint = countAsHint)
+        is Hint.NoteSingle -> NoteSingleSteps.complete(state, hint, countAsHint = countAsHint)
+        is Hint.CandidateSweep -> {
             var s = state
             // Re-applying these is idempotent — finished cells skip.
-            s = GameReducer.applyCandidateSweepFill(s)
+            s = CandidateSweepSteps.fill(s)
             for (plan in hint.plan) {
-                s = GameReducer.advanceCandidateSweepCell(
+                s = CandidateSweepSteps.advance(
                     state = s,
                     currentCell = plan.cellIdx,
                     doomedDigits = plan.doomedDigits,
                     eliminatorPeers = plan.eliminatorPeers,
                 )
             }
-            GameReducer.completeCandidateSweep(s, hint, countAsHint = countAsHint)
+            CandidateSweepSteps.complete(s, hint, countAsHint = countAsHint)
         }
-        is HintEngine.EliminationHint -> {
+        is Hint.EliminationHint -> {
             var s = state
             for (step in hint.plan) {
-                s = GameReducer.advanceEliminationStep(
+                s = EliminationSteps.advance(
                     state = s,
                     currentCell = step.cellIdx,
                     doomedDigits = step.doomedDigits,
                     explainerCells = step.explainerCells,
                 )
             }
-            GameReducer.completeEliminationHint(s, hint, countAsHint = countAsHint)
+            EliminationSteps.complete(s, hint, countAsHint = countAsHint)
         }
     }
 
-    private suspend fun runNakedSingle(hint: HintEngine.NakedSingle, countAsHint: Boolean) {
-        setState(GameReducer.beginNakedSingleHint(getState(), hint))
+    private suspend fun runNakedSingle(hint: Hint.NakedSingle, countAsHint: Boolean) {
+        setState(NakedSingleSteps.begin(getState(), hint))
         delay(stepMs())
         for (d in 1..9) {
-            setState(GameReducer.advanceNakedSingleStep(
+            setState(NakedSingleSteps.advance(
                 state = getState(),
                 activeDigit = d,
                 eliminatorCells = hint.eliminators[d].orEmpty(),
@@ -164,45 +168,45 @@ class HintAnimator(
             ))
             delay(stepMs())
         }
-        setState(GameReducer.completeNakedSingleHint(getState(), hint, countAsHint = countAsHint))
+        setState(NakedSingleSteps.complete(getState(), hint, countAsHint = countAsHint))
     }
 
-    private suspend fun runNoteSingle(hint: HintEngine.NoteSingle, countAsHint: Boolean) {
-        setState(GameReducer.beginNoteSingleHint(getState(), hint))
+    private suspend fun runNoteSingle(hint: Hint.NoteSingle, countAsHint: Boolean) {
+        setState(NoteSingleSteps.begin(getState(), hint))
         // Two pauses so the player has a beat to recognize the cell and
         // its lone candidate before the value drops in.
         delay(stepMs())
         delay(stepMs())
-        setState(GameReducer.completeNoteSingleHint(getState(), hint, countAsHint = countAsHint))
+        setState(NoteSingleSteps.complete(getState(), hint, countAsHint = countAsHint))
     }
 
-    private suspend fun runHiddenSingle(hint: HintEngine.HiddenSingle, countAsHint: Boolean) {
-        setState(GameReducer.beginHiddenSingleHint(getState(), hint))
+    private suspend fun runHiddenSingle(hint: Hint.HiddenSingle, countAsHint: Boolean) {
+        setState(HiddenSingleSteps.begin(getState(), hint))
         delay(stepMs())
         for (cellIdx in hint.unit.cells) {
             if (cellIdx == hint.targetCell) continue
             if (getState().cells[cellIdx].value != null) continue
-            setState(GameReducer.advanceHiddenSingleStep(
+            setState(HiddenSingleSteps.advance(
                 state = getState(),
                 currentCell = cellIdx,
                 eliminatorCells = hint.eliminators[cellIdx].orEmpty(),
             ))
             delay(stepMs())
         }
-        setState(GameReducer.advanceHiddenSingleStep(
+        setState(HiddenSingleSteps.advance(
             state = getState(),
             currentCell = null,
             eliminatorCells = emptySet(),
         ))
         delay(stepMs())
-        setState(GameReducer.completeHiddenSingleHint(getState(), hint, countAsHint = countAsHint))
+        setState(HiddenSingleSteps.complete(getState(), hint, countAsHint = countAsHint))
     }
 
-    private suspend fun runEliminationHint(hint: HintEngine.EliminationHint, countAsHint: Boolean) {
-        setState(GameReducer.beginEliminationHint(getState(), hint))
+    private suspend fun runEliminationHint(hint: Hint.EliminationHint, countAsHint: Boolean) {
+        setState(EliminationSteps.begin(getState(), hint))
         delay(stepMs())
         for (step in hint.plan) {
-            setState(GameReducer.advanceEliminationStep(
+            setState(EliminationSteps.advance(
                 state = getState(),
                 currentCell = step.cellIdx,
                 doomedDigits = step.doomedDigits,
@@ -210,25 +214,25 @@ class HintAnimator(
             ))
             delay(sweepMs())
         }
-        setState(GameReducer.advanceEliminationStep(
+        setState(EliminationSteps.advance(
             state = getState(),
             currentCell = null,
             doomedDigits = emptySet(),
             explainerCells = emptySet(),
         ))
         delay(stepMs())
-        setState(GameReducer.completeEliminationHint(getState(), hint, countAsHint = countAsHint))
+        setState(EliminationSteps.complete(getState(), hint, countAsHint = countAsHint))
     }
 
-    private suspend fun runCandidateSweep(hint: HintEngine.CandidateSweep, countAsHint: Boolean) {
-        setState(GameReducer.beginCandidateSweep(getState(), hint))
+    private suspend fun runCandidateSweep(hint: Hint.CandidateSweep, countAsHint: Boolean) {
+        setState(CandidateSweepSteps.begin(getState(), hint))
         delay(stepMs())
         if (hint.initialFill) {
-            setState(GameReducer.applyCandidateSweepFill(getState()))
+            setState(CandidateSweepSteps.fill(getState()))
             delay(stepMs())
         }
         for (plan in hint.plan) {
-            setState(GameReducer.advanceCandidateSweepCell(
+            setState(CandidateSweepSteps.advance(
                 state = getState(),
                 currentCell = plan.cellIdx,
                 doomedDigits = plan.doomedDigits,
@@ -236,13 +240,13 @@ class HintAnimator(
             ))
             delay(sweepMs())
         }
-        setState(GameReducer.advanceCandidateSweepCell(
+        setState(CandidateSweepSteps.advance(
             state = getState(),
             currentCell = null,
             doomedDigits = emptySet(),
             eliminatorPeers = emptySet(),
         ))
         delay(stepMs())
-        setState(GameReducer.completeCandidateSweep(getState(), hint, countAsHint = countAsHint))
+        setState(CandidateSweepSteps.complete(getState(), hint, countAsHint = countAsHint))
     }
 }

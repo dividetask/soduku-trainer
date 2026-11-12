@@ -15,7 +15,7 @@ In `HintEngineTest.kt`:
 
 ## Reducer + animation
 
-In `GameReducerTest.kt`:
+In `BoardMovesAndHintStepsTest.kt`:
 
 - **`Candidate Sweep with initial fill seeds notes, prunes, and undoes
   atomically`** — runs through `beginCandidateSweep` ->

@@ -1,6 +1,6 @@
 # Reducer Tests
 
-`GameReducer` is a pure state machine. Every test starts from
+`BoardMoves` and the hint-step objects (`NakedSingleSteps`, `CandidateSweepSteps`, …) are pure state machines. Every test starts from
 `GameState.forNewGame(puzzle)`, applies a sequence of reducer calls,
 and asserts on the resulting `GameState`. No coroutines, no Android,
 no animator.

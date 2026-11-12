@@ -19,7 +19,7 @@ class EntryCheckTest {
     private val start = GameState.forNewGame(puzzle)
 
     private fun tap(digit: Int, color: GuessColor = GuessColor.Blue, pencil: Boolean = false, from: GameState = start) =
-        GameReducer.tapCell(from.copy(activeDigit = digit, activeColor = color, pencilOn = pencil), 0, 2)
+        BoardMoves.tapCell(from.copy(activeDigit = digit, activeColor = color, pencilOn = pencil), 0, 2)
 
     private fun forbidden(before: GameState, after: GameState) =
         EntryCheck.isForbidden(before, after, preventValues = true, preventNotes = true)
@@ -77,7 +77,7 @@ class EntryCheckTest {
     @Test
     fun `saved game round-trips`() {
         val noted = tap(4, pencil = true)
-        val s = GameReducer.tapCell(noted.copy(activeDigit = 6, activeColor = GuessColor.Red, pencilOn = false), 0, 3)
+        val s = BoardMoves.tapCell(noted.copy(activeDigit = 6, activeColor = GuessColor.Red, pencilOn = false), 0, 3)
         val back = SavedGame.decode(SavedGame.of(s).encode())
         assertNotNull(back)
         val restored = back!!.toGameState()
@@ -86,7 +86,7 @@ class EntryCheckTest {
         assertEquals(s.puzzle, restored.puzzle)
         assertEquals(GuessColor.Red, restored.activeColor)
         // Undo history still works after restoring.
-        assertEquals(GameReducer.undo(s).cells, GameReducer.undo(restored).cells)
+        assertEquals(BoardMoves.undo(s).cells, BoardMoves.undo(restored).cells)
     }
 
     @Test

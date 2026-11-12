@@ -36,10 +36,10 @@ see how that's encoded.
 | Doc | JUnit file | Topic |
 |---|---|---|
 | `hint-engine-tests.md` | `HintEngineTest.kt` | The technique-finder cascade |
-| `reducer-tests.md` | `GameReducerTest.kt` | Board state, taps, pencil mode, color picker |
-| `undo-tests.md` | `GameReducerTest.kt` | History semantics for every move type |
-| `progressive-hint-tests.md` | `GameReducerTest.kt` | The three-stage Hint button flow |
-| `sweep-tests.md` | `GameReducerTest.kt`, `HintEngineTest.kt` | Candidate Sweep behavior |
+| `reducer-tests.md` | `BoardMovesAndHintStepsTest.kt` | Board state, taps, pencil mode, color picker |
+| `undo-tests.md` | `BoardMovesAndHintStepsTest.kt` | History semantics for every move type |
+| `progressive-hint-tests.md` | `BoardMovesAndHintStepsTest.kt` | The three-stage Hint button flow |
+| `sweep-tests.md` | `BoardMovesAndHintStepsTest.kt`, `HintEngineTest.kt` | Candidate Sweep behavior |
 
 ## Conventions
 

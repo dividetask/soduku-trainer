@@ -42,9 +42,9 @@ class TrainerTest {
         error("no $method drill with two or more singles")
     }
 
-    private fun target(hint: HintEngine.Hint): Int = when (hint) {
-        is HintEngine.NakedSingle -> hint.targetCell
-        is HintEngine.HiddenSingle -> hint.targetCell
+    private fun target(hint: Hint): Int = when (hint) {
+        is Hint.NakedSingle -> hint.targetCell
+        is Hint.HiddenSingle -> hint.targetCell
         else -> error("not a single: $hint")
     }
 
@@ -287,8 +287,8 @@ class TrainerTest {
             drill.instances.map { it.keyCells.toSet() }.toSet(),
         )
         // The first instance is the one an ordinary hint would show.
-        val cands = HintEngine.candidateGrid(drill.grid.toIntArray(), drill.marks.toTypedArray())
-        assertEquals(HintEngine.findXWing(drill.grid.toIntArray(), cands), drill.instances.first())
+        val cands = Candidates.of(drill.grid.toIntArray(), drill.marks.toTypedArray())
+        assertEquals(XWingFinder.find(drill.grid.toIntArray(), cands), drill.instances.first())
     }
 
     @Test
@@ -348,9 +348,9 @@ class TrainerTest {
     fun `undoing a wrong move returns the drill to in progress`() {
         val drill = twoXWingDrill()
         val start = drill.toGameState().copy(activeDigit = 5, pencilOn = true)
-        val wrong = GameReducer.tapCell(start, row = 4, col = 4)
+        val wrong = BoardMoves.tapCell(start, row = 4, col = 4)
         assertEquals(TrainerJudge.Verdict.Wrong, TrainerJudge.judge(drill, wrong))
-        assertEquals(TrainerJudge.Verdict.InProgress, TrainerJudge.judge(drill, GameReducer.undo(wrong)))
+        assertEquals(TrainerJudge.Verdict.InProgress, TrainerJudge.judge(drill, BoardMoves.undo(wrong)))
     }
 
     @Test
