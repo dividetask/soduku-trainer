@@ -55,6 +55,7 @@ fun Board(
     val unitBg = Color(0xFFE3F2FD) // hint unit frame: very pale blue
     val currentBg = Color(0xFFFFE082) // hint sweep cursor: amber
     val pencilColor = Color(0xFF607D8B)
+    val mistakeBg = Color(0xFFEF9A9A) // cell with a mistake: red
 
     Box(
         modifier = modifier
@@ -122,6 +123,17 @@ fun Board(
                                     size = Size(cellW, cellH),
                                 )
                             }
+                        }
+                    }
+
+                    // Mistakes found by pressing Hint.
+                    if (hint is HintUi.Mistakes) {
+                        for (idx in hint.cells) {
+                            drawRect(
+                                color = mistakeBg,
+                                topLeft = Offset((idx % 9) * cellW, (idx / 9) * cellH),
+                                size = Size(cellW, cellH),
+                            )
                         }
                     }
 

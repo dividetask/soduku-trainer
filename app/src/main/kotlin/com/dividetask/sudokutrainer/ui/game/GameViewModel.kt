@@ -113,13 +113,16 @@ class GameViewModel(
 
     /** Commit [next] unless the "prevent incorrect" settings forbid the move. */
     private fun applyPlayerMove(next: GameState) {
+        clearMistakes()
         val before = _state.value
         val s = settings
         if (EntryCheck.isForbidden(before, next, s.preventIncorrectValues, s.preventIncorrectNotes)) {
             flashError()
             return
         }
-        _state.value = next
+        // [next] was built before clearMistakes(), so carry over the
+        // current overlay rather than its stale one.
+        _state.value = next.copy(hintUi = _state.value.hintUi)
     }
 
     /** Flash the board red; the rejected move is never applied. */
@@ -160,15 +163,18 @@ class GameViewModel(
     }
 
     fun onCellDoubleTapped(row: Int, col: Int) {
+        clearMistakes()
         _state.value = GameReducer.doubleTapCell(_state.value, row, col)
     }
 
     fun onUndo() {
+        clearMistakes()
         _state.value = GameReducer.undo(_state.value)
     }
 
     fun onClear() {
         if (_state.value.phase != GameState.Phase.Playing) return
+        clearMistakes()
         _state.value = GameReducer.resetBoard(_state.value)
         runStartingSweep()
     }
@@ -258,12 +264,22 @@ class GameViewModel(
             return
         }
 
-        // Stage 1: find a new hint.
-        // If the board has any incorrect entries, the engine would reason
-        // from inconsistent state; flash red instead.
+        // Stage 1: find a new hint. A board with mistakes (wrong values,
+        // or notes missing the answer) would mislead the engine, so show
+        // the mistakes in red instead.
+        val mistakes = s.mistakeCells()
+        if (mistakes.isNotEmpty()) {
+            _state.value = s.copy(hintUi = HintUi.Mistakes(mistakes))
+            mistakesJob?.cancel()
+            mistakesJob = viewModelScope.launch {
+                delay(config.pendingHintMs)
+                clearMistakes()
+            }
+            return
+        }
         val grid = IntArray(81) { i -> s.cells[i].value ?: 0 }
         val marks = Array(81) { i -> s.cells[i].pencilMarks.keys.toSet() }
-        val hint = if (s.hasIncorrectEntry) null else HintEngine.find(grid, marks)
+        val hint = HintEngine.find(grid, marks)
 
         when (hint) {
             null -> {
@@ -293,6 +309,15 @@ class GameViewModel(
                 _state.value = GameReducer.setPendingHint(s, hint, hint.keyCells)
                 startPendingHintTimer()
             }
+        }
+    }
+
+    private var mistakesJob: Job? = null
+
+    /** Take down the red mistake highlight, if it's showing. */
+    private fun clearMistakes() {
+        if (_state.value.hintUi is HintUi.Mistakes) {
+            _state.value = _state.value.copy(hintUi = null)
         }
     }
 

@@ -28,6 +28,18 @@ data class GameState(
     val hasIncorrectEntry: Boolean get() =
         cells.any { it.value != null && it.value != puzzle.solutionAt(it.row, it.col) }
 
+    /**
+     * Cells holding a mistake: a value that isn't the cell's answer (in
+     * any color), or notes that no longer include the answer. An empty
+     * cell with no notes at all isn't a mistake.
+     */
+    fun mistakeCells(): Set<Int> = cells.indices.filterTo(mutableSetOf()) { i ->
+        val c = cells[i]
+        val answer = puzzle.solution[i]
+        if (c.value != null) c.value != answer
+        else c.pencilMarks.isNotEmpty() && answer !in c.pencilMarks
+    }
+
     /** Number of non-given cells that are still empty. */
     val emptyCellCount: Int get() =
         cells.count { !it.given && it.value == null }

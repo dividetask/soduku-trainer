@@ -88,5 +88,6 @@ internal fun hintLabel(state: GameState): String = when (val ui = state.hintUi) 
     is HintUi.Elimination -> ui.techniqueName
     HintUi.NoHintFlash -> "No hint available"
     HintUi.ErrorFlash -> "Incorrect"
+    is HintUi.Mistakes -> if (ui.cells.size == 1) "1 mistake" else "${ui.cells.size} mistakes"
     null -> state.pendingHint?.techniqueName.orEmpty()
 }

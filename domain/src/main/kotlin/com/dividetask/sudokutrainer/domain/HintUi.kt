@@ -20,6 +20,12 @@ sealed interface HintUi {
     data object ErrorFlash : HintUi
 
     /**
+     * Shown when Hint is pressed while the board has mistakes: [cells]
+     * are painted red instead of giving a hint. See [GameState.mistakeCells].
+     */
+    data class Mistakes(val cells: Set<Int>) : HintUi
+
+    /**
      * Naked-single teaching animation in progress.
      *
      * - [targetCell] is shaded green for the duration.

@@ -202,9 +202,15 @@ on) is part of the starting position, so it can't be undone.
 
 ## Hint
 
-Not implemented in v1. The button is present in the UI but takes no
-action (or is disabled/greyed-out). The intent for later versions is
-described in [`roadmap.md`](roadmap.md).
+Each press advances a hint: technique name, then the pattern's cells,
+then the animation (or, with *Show work* off, the result at once).
+
+**Mistakes first.** If the board holds a mistake when Hint is pressed —
+a value that isn't the cell's answer (in any color), or a cell whose
+notes no longer include its answer — no hint is given. Instead those
+cells are painted red and the top bar says how many mistakes there are.
+The highlight clears on the next board change, or after
+`pending_hint_ms`.
 
 ## Finishing and leaving a game
 

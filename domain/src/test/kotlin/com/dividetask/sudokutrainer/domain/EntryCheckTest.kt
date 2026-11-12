@@ -61,6 +61,20 @@ class EntryCheckTest {
     }
 
     @Test
+    fun `mistakes are wrong values and notes missing the answer`() {
+        assertEquals(emptySet<Int>(), start.mistakeCells())
+        // A wrong value counts in any color.
+        assertEquals(setOf(2), tap(6, GuessColor.Red).mistakeCells())
+        // Notes that still include the answer (4) are fine...
+        val withAnswer = tap(4, pencil = true).let { tap(6, pencil = true, from = it) }
+        assertEquals(emptySet<Int>(), withAnswer.mistakeCells())
+        // ...but notes that have lost it are a mistake.
+        assertEquals(setOf(2), tap(4, pencil = true, from = withAnswer).mistakeCells())
+        // The correct value isn't.
+        assertEquals(emptySet<Int>(), tap(4).mistakeCells())
+    }
+
+    @Test
     fun `saved game round-trips`() {
         val noted = tap(4, pencil = true)
         val s = GameReducer.tapCell(noted.copy(activeDigit = 6, activeColor = GuessColor.Red, pencilOn = false), 0, 3)
