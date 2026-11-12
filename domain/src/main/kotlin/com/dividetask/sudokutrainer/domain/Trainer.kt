@@ -40,15 +40,15 @@ enum class TrainerMethod(
     ),
     PointingPair(
         "Pointing Pair", usesNotes = true, minLevel = 3,
-        "Inside a box, every candidate for a digit lies on one row or column. The " +
-            "digit must go on that line inside the box, so remove it from the rest of " +
-            "the line outside the box.",
+        "Pick one digit and one box. If the only cells in that box that could hold " +
+            "the digit all sit on the same row or column, the digit must go on that line " +
+            "inside the box. Remove it from the rest of that line outside the box.",
     ),
     BoxLineReduction(
         "Box-Line Reduction", usesNotes = true, minLevel = 3,
-        "In a row or column, every candidate for a digit lies inside one box. The " +
-            "digit must go on that line inside the box, so remove it from the box's " +
-            "other cells.",
+        "Pick one digit and one row or column. If the only cells in that line that " +
+            "could hold the digit all sit inside the same box, the digit must go in that " +
+            "box on that line. Remove it from the box's other cells.",
     ),
     NakedTriple(
         "Naked Triple", usesNotes = true, minLevel = 5,
