@@ -7,60 +7,66 @@ Please add the Kotlin plugin to the common parent project or the root project, t
 If the parent project does not need the plugin, add 'apply false' to the plugin line.
 See: https://docs.gradle.org/current/userguide/plugins.html#sec:subprojects_plugins_dsl
 The Kotlin plugin was loaded in the following projects: ':app', ':domain'
-> Task :app:preBuild UP-TO-DATE
 > Task :domain:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preBuild UP-TO-DATE
 > Task :app:preDebugBuild UP-TO-DATE
 > Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
 > Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :app:generateDebugBuildConfig
-> Task :app:checkDebugAarMetadata
-> Task :app:generateDebugResValues
-> Task :app:mapDebugSourceSetPaths
-> Task :app:generateDebugResources
-> Task :app:mergeDebugResources
+> Task :app:checkDebugAarMetadata UP-TO-DATE
 > Task :domain:processResources NO-SOURCE
-> Task :app:packageDebugResources
-> Task :app:parseDebugLocalResources
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
 > Task :app:createDebugCompatibleScreenManifests
-> Task :app:extractDeepLinksDebug
+> Task :app:extractDeepLinksDebug UP-TO-DATE
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
 > Task :app:processDebugManifestForPackage
 > Task :app:processDebugResources
-> Task :app:javaPreCompileDebug
-> Task :app:mergeDebugShaders
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:mergeDebugShaders UP-TO-DATE
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
-> Task :app:mergeDebugAssets
-> Task :app:compressDebugAssets
-> Task :app:desugarDebugFileDependencies
-> Task :app:checkDebugDuplicateClasses
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
 > Task :domain:compileKotlin
 > Task :domain:compileJava NO-SOURCE
 > Task :domain:classes UP-TO-DATE
-> Task :domain:jar UP-TO-DATE
-> Task :app:mergeExtDexDebug
+> Task :domain:jar
 > Task :app:mergeLibDexDebug
-> Task :app:mergeDebugJniLibFolders
-> Task :app:mergeDebugNativeLibs
+> Task :app:mergeDebugNativeLibs UP-TO-DATE
+> Task :app:stripDebugDebugSymbols UP-TO-DATE
 
-> Task :app:stripDebugDebugSymbols
-Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so.
-
-> Task :app:validateSigningDebug
-> Task :app:writeDebugAppMetadata
-> Task :app:writeDebugSigningConfigVersions
-> Task :app:compileDebugKotlin
-> Task :app:compileDebugJavaWithJavac
-> Task :app:dexBuilderDebug
-> Task :app:mergeDebugGlobalSynthetics
-> Task :app:processDebugJavaRes
-> Task :app:mergeProjectDexDebug
-> Task :app:mergeDebugJavaResource
-> Task :app:packageDebug
-> Task :app:createDebugApkListingFileRedirect
-> Task :app:assembleDebug
+> Task :app:compileDebugKotlin FAILED
+e: file:///home/brett/Projects/soduku-trainer/app/src/main/kotlin/com/dividetask/sudokutrainer/data/SettingsStore.kt:38:33 Unresolved reference 'Difficulty'.
+e: file:///home/brett/Projects/soduku-trainer/app/src/main/kotlin/com/dividetask/sudokutrainer/data/SettingsStore.kt:38:66 Unresolved reference 'it'.
 w: Detected multiple Kotlin daemon sessions at 
 
-BUILD SUCCESSFUL in 35s
-39 actionable tasks: 38 executed, 1 up-to-date
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 15s
+31 actionable tasks: 10 executed, 21 up-to-date
+BUILD FAILED (exit 1) — no new APK. See the Gradle output above;
+re-run with --stacktrace or --info (append to TASK) for more detail.
