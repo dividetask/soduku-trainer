@@ -51,7 +51,7 @@ The Kotlin plugin was loaded in the following projects: ':app', ':domain'
 > Task :app:compileDebugJavaWithJavac
 > Task :app:dexBuilderDebug
 > Task :app:mergeDebugGlobalSynthetics UP-TO-DATE
-> Task :app:processDebugJavaRes UP-TO-DATE
+> Task :app:processDebugJavaRes
 > Task :app:mergeProjectDexDebug
 > Task :app:mergeDebugJavaResource
 > Task :app:packageDebug
@@ -59,4 +59,4 @@ The Kotlin plugin was loaded in the following projects: ':app', ':domain'
 > Task :app:assembleDebug
 
 BUILD SUCCESSFUL in 14s
-39 actionable tasks: 13 executed, 26 up-to-date
+39 actionable tasks: 14 executed, 25 up-to-date
