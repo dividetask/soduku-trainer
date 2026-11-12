@@ -1,6 +1,7 @@
 package com.dividetask.sudokutrainer.data
 
 import android.content.Context
+import com.dividetask.sudokutrainer.domain.Difficulty
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
