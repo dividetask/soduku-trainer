@@ -85,8 +85,8 @@ Singles").
 
 On completion the top bar shows "Correct!" and a new drill is dealt
 after a second. When the **hint** made the finishing move, the board
-stays up for five seconds instead and the Undo button becomes **Show
-Again**, which replays that hint slowly; the five seconds restart once
-the replay ends.
+stays up for five seconds instead. Pressing **Undo** during either pause
+cancels the next drill and takes the last move back, so the player can
+look again — and press Hint twice to see the method again.
 **Hint** first highlights the pattern's cells, then shows (or applies,
 with *Show work* off) the method's next step on the current board.

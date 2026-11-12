@@ -50,7 +50,7 @@ class TrainerViewModel(
 
     private val _solvedByHint = MutableStateFlow(false)
 
-    /** True while a drill the hint finished waits to be replaced; Show Again replays it. */
+    /** True while a drill the hint finished waits to be replaced; Undo takes it back. */
     val solvedByHint: StateFlow<Boolean> = _solvedByHint.asStateFlow()
 
     private var drill: TrainerDrill? = null
@@ -113,7 +113,8 @@ class TrainerViewModel(
     private fun onSolved(byHint: Boolean) {
         _status.value = Status.Solved
         _solvedByHint.value = byHint
-        // A hint's answer stays up longer, so there's time for Show Again.
+        // A hint's answer stays up longer, so there's time to press Undo
+        // and look again.
         scheduleNextDrill(if (byHint) HINT_SOLVED_PAUSE_MS else SOLVED_PAUSE_MS)
     }
 
@@ -121,26 +122,6 @@ class TrainerViewModel(
         advanceJob?.cancel()
         advanceJob = viewModelScope.launch {
             delay(delayMs)
-            nextDrill()
-        }
-    }
-
-    /**
-     * Replay the hint that finished the drill, slowed down as in a game,
-     * then wait the full pause again before the next drill.
-     */
-    fun onShowAgain() {
-        val s = _state.value ?: return
-        if (_status.value != Status.Solved || !_solvedByHint.value || animator.isRunning) return
-        val hint = s.lastHint ?: return
-        advanceJob?.cancel()
-        // Take the hint's move back off the board so the animation can
-        // make it again.
-        _state.value = GameReducer.undo(s).copy(lastHint = hint)
-        val job = animator.launch(hint, countAsHint = false, speedMultiplier = config.showAgainMultiplier)
-        advanceJob = viewModelScope.launch {
-            job?.join()
-            delay(HINT_SOLVED_PAUSE_MS)
             nextDrill()
         }
     }
@@ -153,7 +134,19 @@ class TrainerViewModel(
     fun onDigitSelected(digit: Int) = update { GameReducer.selectDigit(it, digit) }
     fun onPencilToggled() = update { GameReducer.togglePencil(it) }
     fun onColorSelected(color: GuessColor) = update { GameReducer.selectColor(it, color) }
-    fun onUndo() = update { GameReducer.undo(it) }
+    /**
+     * Undo. During the pause after a solved drill it also cancels the
+     * move to the next drill, so the player can look again (and press
+     * Hint twice to see the method again).
+     */
+    fun onUndo() {
+        if (_status.value == Status.Solved) {
+            advanceJob?.cancel()
+            _solvedByHint.value = false
+            _status.value = Status.Playing
+        }
+        update { GameReducer.undo(it) }
+    }
 
     fun onCellTapped(row: Int, col: Int) = playerMove { GameReducer.tapCell(it, row, col) }
     fun onCellDoubleTapped(row: Int, col: Int) = playerMove { GameReducer.doubleTapCell(it, row, col) }

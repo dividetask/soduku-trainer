@@ -70,10 +70,12 @@ enum class TrainerMethod(
     ),
     EmptyRectangle(
         "Empty Rectangle", usesNotes = true, minLevel = 7,
-        "Inside a box, a digit's candidates form an L along one row and one column. " +
-            "A line elsewhere with only two spots for the digit links to the L, so " +
-            "wherever the digit goes it rules out the cell where that link and the L " +
-            "would cross.",
+        "In one box, every candidate for a digit lies along one row and one column of " +
+            "that box, so the digit must go on that row or that column. Outside the box, " +
+            "find a column where the digit has only two spots, one of them on the box's row. " +
+            "Remove the digit where the other spot's row crosses the box's column: a digit " +
+            "there would push the box's digit onto its row, forcing the other spot to hold " +
+            "it too and putting two in one row (it also works with rows and columns swapped).",
     ),
     Swordfish(
         "Swordfish", usesNotes = true, minLevel = 7,

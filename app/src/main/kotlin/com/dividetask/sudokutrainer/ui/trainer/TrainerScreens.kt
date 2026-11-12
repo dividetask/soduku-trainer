@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -20,7 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -121,24 +119,14 @@ fun TrainerScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         val playing = status == TrainerViewModel.Status.Playing
-                        if (solvedByHint) {
-                            // The hint solved the drill: replay it before the next one.
-                            Button(
-                                onClick = viewModel::onShowAgain,
-                                enabled = s.phase == GameState.Phase.Playing,
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6A1B9A)),
-                            ) {
-                                Text("Show Again")
-                            }
-                        } else {
-                            OutlinedButton(
-                                onClick = viewModel::onUndo,
-                                enabled = playing && s.phase == GameState.Phase.Playing && s.history.isNotEmpty(),
-                                modifier = Modifier.weight(1f),
-                            ) {
-                                Text("Undo")
-                            }
+                        OutlinedButton(
+                            onClick = viewModel::onUndo,
+                            // Also works during the pause after a solve.
+                            enabled = status != TrainerViewModel.Status.Loading &&
+                                s.phase == GameState.Phase.Playing && s.history.isNotEmpty(),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("Undo")
                         }
                         HintButton(
                             state = s,
@@ -195,8 +183,7 @@ private fun trainerLabel(
     progress: TrainerJudge.Progress?,
     solvedByHint: Boolean,
 ): String = when {
-    status == TrainerViewModel.Status.Solved && solvedByHint && state?.phase == GameState.Phase.Hinting -> "Showing again…"
-    status == TrainerViewModel.Status.Solved && solvedByHint -> "Solved by hint. Next puzzle soon…"
+    status == TrainerViewModel.Status.Solved && solvedByHint -> "Solved by hint. Undo to look again"
     status == TrainerViewModel.Status.Solved -> "Correct! Next puzzle…"
     status == TrainerViewModel.Status.Loading -> "Finding a puzzle…"
     state?.hintUi == HintUi.ErrorFlash -> "Not a ${method.techniqueName}"
