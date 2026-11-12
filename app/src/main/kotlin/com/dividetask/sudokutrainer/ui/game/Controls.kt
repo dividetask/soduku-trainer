@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dividetask.sudokutrainer.domain.GameState
 import com.dividetask.sudokutrainer.domain.GuessColor
+import com.dividetask.sudokutrainer.ui.SettingsButton
+import com.dividetask.sudokutrainer.ui.VersionLabel
 import com.dividetask.sudokutrainer.ui.theme.toColor
 
 @Composable
@@ -258,27 +260,36 @@ fun HintButton(
     }
 }
 
-/** Row across the top of a play screen: Main menu on the left, then [label]. */
+/**
+ * Top of a play screen: the app version at the top right, then a row
+ * with Main menu on the left, [label] in the middle and the Settings
+ * gear on the right.
+ */
 @Composable
 fun TopBar(
     label: String,
     onMainMenu: () -> Unit,
+    onSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        OutlinedButton(onClick = onMainMenu) {
-            Text("Main menu")
+    Column(modifier = modifier.fillMaxWidth()) {
+        VersionLabel()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedButton(onClick = onMainMenu) {
+                Text("Main menu")
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f),
+            )
+            SettingsButton(onSettings)
         }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f),
-        )
     }
 }

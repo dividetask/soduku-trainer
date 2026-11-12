@@ -6,12 +6,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -21,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.dividetask.sudokutrainer.ui.SettingsButton
+import com.dividetask.sudokutrainer.ui.VersionLabel
 
 /** Resume (when a game is saved), New Game and Lesson, with Settings as a top-right icon. */
 @Composable
@@ -37,13 +35,14 @@ fun MainMenuScreen(
                 .fillMaxSize()
                 .padding(inner),
         ) {
-            IconButton(
-                onClick = onSettings,
+            Column(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(8.dp),
+                horizontalAlignment = Alignment.End,
             ) {
-                Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                VersionLabel()
+                SettingsButton(onSettings)
             }
             Column(
                 modifier = Modifier

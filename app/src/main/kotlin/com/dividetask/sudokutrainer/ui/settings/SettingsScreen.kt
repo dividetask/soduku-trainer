@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -19,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dividetask.sudokutrainer.data.Settings
@@ -43,18 +46,28 @@ fun SettingsScreen(
             Text("Settings", style = MaterialTheme.typography.displaySmall)
             Text("Puzzle difficulty", style = MaterialTheme.typography.titleLarge)
             // No default: on first launch the player picks one before Done.
-            Difficulty.entries.forEach { d ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { store.update(settings.copy(difficulty = d)) },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(
-                        selected = settings.difficulty == d,
-                        onClick = { store.update(settings.copy(difficulty = d)) },
-                    )
-                    Text("${d.level}. ${d.label}", style = MaterialTheme.typography.titleMedium)
+            // A tight column of rows; the whole row is the touch target, so
+            // the radio button skips its own 48dp minimum size.
+            Column {
+                Difficulty.entries.forEach { d ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(36.dp)
+                            .selectable(
+                                selected = settings.difficulty == d,
+                                onClick = { store.update(settings.copy(difficulty = d)) },
+                                role = Role.RadioButton,
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = settings.difficulty == d, onClick = null)
+                        Text(
+                            "${d.level}. ${d.label}",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(start = 12.dp),
+                        )
+                    }
                 }
             }
             Text("Options", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 8.dp))

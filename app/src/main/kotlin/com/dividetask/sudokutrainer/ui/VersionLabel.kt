@@ -9,14 +9,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import com.dividetask.sudokutrainer.BuildConfig
 
-/** The app version, small and grey, so screenshots show which build they came from. */
+/** The app version, small and grey at the top right, so screenshots show which build they came from. */
 @Composable
 fun VersionLabel(modifier: Modifier = Modifier) {
     Text(
         text = BuildConfig.VERSION_NAME,
         style = MaterialTheme.typography.labelSmall,
         color = Color(0xFF9E9E9E),
-        textAlign = TextAlign.Center,
+        textAlign = TextAlign.End,
         modifier = modifier.fillMaxWidth(),
     )
 }

@@ -15,12 +15,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dividetask.sudokutrainer.domain.GameState
 import com.dividetask.sudokutrainer.domain.HintUi
-import com.dividetask.sudokutrainer.ui.VersionLabel
 
 @Composable
 fun GameScreen(
     viewModel: GameViewModel,
     onExit: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val exit by viewModel.exitSignal.collectAsStateWithLifecycle()
@@ -43,7 +43,7 @@ fun GameScreen(
                     .padding(horizontal = 12.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                TopBar(label = hintLabel(state), onMainMenu = viewModel::onMainMenu)
+                TopBar(label = hintLabel(state), onMainMenu = viewModel::onMainMenu, onSettings = onSettings)
                 Board(
                     state = state,
                     onCellTap = viewModel::onCellTapped,
@@ -66,7 +66,6 @@ fun GameScreen(
                     onHint = viewModel::onHint,
                     onShowAgain = viewModel::onShowAgain,
                 )
-                VersionLabel()
             }
 
             // (overlays below)

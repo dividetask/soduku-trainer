@@ -31,7 +31,6 @@ import com.dividetask.sudokutrainer.ui.game.Board
 import com.dividetask.sudokutrainer.ui.game.ColorPickerRow
 import com.dividetask.sudokutrainer.ui.game.DigitRow
 import com.dividetask.sudokutrainer.ui.game.HintButton
-import com.dividetask.sudokutrainer.ui.VersionLabel
 import com.dividetask.sudokutrainer.ui.game.TopBar
 
 /** One button per solving method. */
@@ -39,6 +38,7 @@ import com.dividetask.sudokutrainer.ui.game.TopBar
 fun TrainerMenuScreen(
     onMethod: (TrainerMethod) -> Unit,
     onMainMenu: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     Scaffold { inner ->
         Column(
@@ -50,7 +50,7 @@ fun TrainerMenuScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            TopBar(label = "Trainer", onMainMenu = onMainMenu)
+            TopBar(label = "Trainer", onMainMenu = onMainMenu, onSettings = onSettings)
             TrainerMethod.entries.forEach { method ->
                 Button(onClick = { onMethod(method) }, modifier = Modifier.fillMaxWidth()) {
                     Text(method.techniqueName, style = MaterialTheme.typography.titleMedium)
@@ -65,6 +65,7 @@ fun TrainerScreen(
     viewModel: TrainerViewModel,
     onMainMenu: () -> Unit,
     onMethod: (TrainerMethod) -> Unit,
+    onSettings: () -> Unit,
 ) {
     val status by viewModel.status.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -83,6 +84,7 @@ fun TrainerScreen(
             TopBar(
                 label = trainerLabel(status, state, method, state?.let(viewModel::progress), solvedByHint),
                 onMainMenu = onMainMenu,
+                onSettings = onSettings,
             )
             Text(method.techniqueName, style = MaterialTheme.typography.headlineSmall)
             Text(method.explanation, style = MaterialTheme.typography.bodyMedium)
@@ -136,7 +138,6 @@ fun TrainerScreen(
                             modifier = Modifier.weight(1f),
                         )
                     }
-                    VersionLabel()
                 }
             }
         }

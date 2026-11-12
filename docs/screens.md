@@ -10,9 +10,10 @@ On the very first launch the app opens on Settings; its **Done** button
 (enabled once a puzzle difficulty is picked) leads to the Main Menu.
 Every later launch opens on the Main Menu.
 
-The Game Screen and the Trainer drill screen show the app's version
-(`BuildConfig.VERSION_NAME`, e.g. `v2.015 a (e687)`) in small grey text
-at the bottom, so screenshots identify the build.
+Every screen except Settings shows the app's version
+(`BuildConfig.VERSION_NAME`, e.g. `v2.017 a (e687)`) in small grey text at
+the top right, so screenshots identify the build, with the Settings gear
+icon below it. Settings' Done returns to the screen it was opened from.
 
 ## 1. Main Menu
 
