@@ -65,6 +65,11 @@ tries another puzzle. The board is shown at that point:
   Notes don't affect judging in these drills.
 - Every other method is shown **with all candidate notes** filled in.
 
+A pattern that is really an easier method is never reported — in hints
+or in the Trainer — as the harder one: an XY-Wing whose three cells share
+a unit is a naked triple, a Swordfish containing an X-Wing is that
+X-Wing, and a naked or hidden triple containing a pair is that pair.
+
 ### Judging
 
 `TrainerJudge` compares the board with the drill's starting position:

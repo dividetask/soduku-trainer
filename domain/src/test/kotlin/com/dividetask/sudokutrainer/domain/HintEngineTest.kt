@@ -418,6 +418,79 @@ class HintEngineTest {
         assertTrue(4 in step.doomedDigits)
     }
 
+    // ---- A pattern that is really an easier method is never reported as the harder one ----
+
+    /** An empty board with every candidate, except where [set] says otherwise. */
+    private fun cands(vararg set: Pair<Int, Set<Int>>): Array<Set<Int>> {
+        val c = Array(81) { (1..9).toSet() }
+        for ((i, v) in set) c[i] = v
+        return c
+    }
+
+    @Test
+    fun `three XY-Wing cells sharing a unit are a naked triple, not an XY-Wing`() {
+        // Column 0: {1,9}, {1,6}, {6,9}.
+        val c = cands(36 to setOf(1, 9), 45 to setOf(1, 6), 72 to setOf(6, 9))
+        assertTrue(XYWingFinder.all(IntArray(81), c).isEmpty())
+        assertTrue(NakedTripleFinder.find(IntArray(81), c) != null)
+    }
+
+    @Test
+    fun `a genuine XY-Wing across units is still found`() {
+        // Pivot (4,0) {1,9}; pincers (4,5) {1,6} in its row and (8,0) {6,9} in its column.
+        val c = cands(36 to setOf(1, 9), 41 to setOf(1, 6), 72 to setOf(6, 9))
+        val h = XYWingFinder.find(IntArray(81), c)
+        assertTrue(h != null)
+        assertEquals(6, h!!.sharedDigit)
+    }
+
+    @Test
+    fun `a Swordfish hiding an X-Wing is reported as the X-Wing`() {
+        // Digit 1: rows 0 and 1 only in columns 0 and 4; row 2 in columns 0 and 8.
+        val ones = setOf(0, 4, 9, 13, 18, 26)
+        val c = Array(81) { i -> if (i / 9 < 3 && i !in ones) (2..9).toSet() else (1..9).toSet() }
+        assertTrue(SwordfishFinder.all(IntArray(81), c).isEmpty())
+        assertTrue(XWingFinder.find(IntArray(81), c) != null)
+    }
+
+    @Test
+    fun `a genuine Swordfish is still found`() {
+        // Digit 1: row 0 in columns {0,4}, row 1 in {4,8}, row 2 in {0,8}.
+        val ones = setOf(0, 4, 13, 17, 18, 26)
+        val c = Array(81) { i -> if (i / 9 < 3 && i !in ones) (2..9).toSet() else (1..9).toSet() }
+        assertTrue(XWingFinder.find(IntArray(81), c) == null)
+        assertTrue(SwordfishFinder.find(IntArray(81), c) != null)
+    }
+
+    @Test
+    fun `a naked triple containing a naked pair is reported as the pair`() {
+        val c = cands(0 to setOf(1, 2), 1 to setOf(1, 2), 2 to setOf(1, 2, 3))
+        assertTrue(NakedTripleFinder.all(IntArray(81), c).isEmpty())
+        assertTrue(NakedPairFinder.find(IntArray(81), c) != null)
+    }
+
+    @Test
+    fun `a genuine naked triple is still found`() {
+        val c = cands(0 to setOf(1, 2), 1 to setOf(2, 3), 2 to setOf(1, 3))
+        assertTrue(NakedTripleFinder.find(IntArray(81), c) != null)
+    }
+
+    @Test
+    fun `a hidden triple containing a hidden pair is reported as the pair`() {
+        // Row 0: 1 and 2 only in columns 0-1; 3 only in columns 0-2.
+        val c = Array(81) { i ->
+            when {
+                i / 9 != 0 -> (1..9).toSet()
+                i == 0 -> setOf(1, 2, 3, 4)
+                i == 1 -> setOf(1, 2, 3, 5)
+                i == 2 -> setOf(3, 6)
+                else -> (4..9).toSet()
+            }
+        }
+        assertTrue(HiddenTripleFinder.all(IntArray(81), c).isEmpty())
+        assertTrue(HiddenPairFinder.find(IntArray(81), c) != null)
+    }
+
     @Test
     fun `returns null on a fully solved grid`() {
         assertNull(HintEngine.find(CANONICAL_SOLUTION))

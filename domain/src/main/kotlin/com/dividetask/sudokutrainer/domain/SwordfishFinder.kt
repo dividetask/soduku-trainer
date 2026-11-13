@@ -27,6 +27,8 @@ internal object SwordfishFinder {
                         val rs = listOf(eligibleRows[i], eligibleRows[j], eligibleRows[k])
                         val cols = (rowPos[rs[0]] + rowPos[rs[1]] + rowPos[rs[2]]).toSet()
                         if (cols.size != 3) continue
+                        // Two rows sharing the same two columns are an X-Wing.
+                        if (containsXWing(rs.map { rowPos[it] })) continue
                         val keys = buildSet {
                             for (r in rs) for (c in cols) {
                                 val idx = r * 9 + c
@@ -61,6 +63,7 @@ internal object SwordfishFinder {
                         val cs = listOf(eligibleCols[i], eligibleCols[j], eligibleCols[k])
                         val rows = (colPos[cs[0]] + colPos[cs[1]] + colPos[cs[2]]).toSet()
                         if (rows.size != 3) continue
+                        if (containsXWing(cs.map { colPos[it] })) continue
                         val keys = buildSet {
                             for (c in cs) for (r in rows) {
                                 val idx = r * 9 + c
@@ -88,4 +91,11 @@ internal object SwordfishFinder {
         }
         return null
     }
+
+    /**
+     * Whether two of the three lines' candidate positions fit in two
+     * cross lines — an X-Wing hiding inside the Swordfish.
+     */
+    private fun containsXWing(lines: List<List<Int>>): Boolean =
+        (0 until 3).any { i -> (i + 1 until 3).any { j -> (lines[i] + lines[j]).toSet().size <= 2 } }
 }

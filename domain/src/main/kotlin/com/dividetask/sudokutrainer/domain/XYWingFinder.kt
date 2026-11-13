@@ -35,6 +35,9 @@ internal object XYWingFinder {
                 for (pb in pincerB) {
                     val cB = (cands[pb] - b).firstOrNull() ?: continue
                     if (cA != cB) continue
+                    // All three cells in one unit is a naked triple, not
+                    // an XY-Wing: never report the easier method as this one.
+                    if (BoardGeometry.UNITS_ORDERED.any { u -> pivot in u.cells && pa in u.cells && pb in u.cells }) continue
                     val shared = cA
                     val seeBoth = PEERS[pa].intersect(PEERS[pb])
                     val plan = mutableListOf<EliminationStep>()

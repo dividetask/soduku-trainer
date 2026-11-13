@@ -31,6 +31,13 @@ internal object HiddenTripleFinder {
                             digitCells[eligible[j]]!! + digitCells[eligible[k]]!!
                         val keys = union.toSet()
                         if (keys.size != 3) continue
+                        // Two digits confined to the same two cells are a
+                        // hidden pair; report that easier method instead.
+                        val ds = listOf(eligible[i], eligible[j], eligible[k])
+                        if ((0 until 3).any { x -> (x + 1 until 3).any { y ->
+                                digitCells[ds[x]]!!.size == 2 && digitCells[ds[x]] == digitCells[ds[y]]
+                            } }
+                        ) continue
                         val plan = mutableListOf<EliminationStep>()
                         for (cell in keys) {
                             val doomed = cands[cell] - triple

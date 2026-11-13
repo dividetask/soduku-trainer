@@ -26,6 +26,12 @@ internal object NakedTripleFinder {
                         val a = candidates[i]; val b = candidates[j]; val c = candidates[k]
                         val union = cands[a] + cands[b] + cands[c]
                         if (union.size != 3) continue
+                        // Two cells with the same two candidates are a naked
+                        // pair; report that easier method instead.
+                        if (listOf(a, b, c).let { t ->
+                                (0 until 3).any { i -> (i + 1 until 3).any { j -> cands[t[i]].size == 2 && cands[t[i]] == cands[t[j]] } }
+                            }
+                        ) continue
                         val plan = mutableListOf<EliminationStep>()
                         for (cell in unit.cells) {
                             if (cell == a || cell == b || cell == c || grid[cell] != 0) continue
