@@ -34,41 +34,81 @@ object TrainerJudge {
             val v = state.cells[i].value ?: continue
             if (drill.grid[i] != v) return Verdict.Wrong
         }
-        val removed = removedNotes(drill, state) ?: return Verdict.Wrong
-        val startElims = drill.instanceEliminations.flatten().toSet()
-        for (r in removed) {
-            if (r !in drill.allEliminations) return Verdict.Wrong
-            // A later elimination only counts once the method reaches it.
-            if (r !in startElims && !justifiedNow(drill, state, r)) return Verdict.Wrong
-        }
-        return if (removed.containsAll(drill.allEliminations)) Verdict.Complete else Verdict.InProgress
+        val replay = replayNotes(drill, state) ?: return Verdict.Wrong
+        if (replay.removed.isEmpty()) return Verdict.InProgress
+        // Done once the method finds nothing more on the player's board,
+        // whichever valid path they took to get there.
+        val left = HintEngine.allEliminations(drill.method.techniqueName, drill.grid.toIntArray(), replay.marks)
+        return if (left.isEmpty()) Verdict.Complete else Verdict.InProgress
     }
 
-    /** Notes removed since the start, or null if any note was added. */
-    private fun removedNotes(drill: TrainerDrill, state: GameState): Set<NoteRef>? {
-        val removed = mutableSetOf<NoteRef>()
+    /**
+     * The player's notes, replayed move by move from the drill's start.
+     * [removed] are the notes removed (and not put back); [seen] maps
+     * each application of the method that was on the board at some step
+     * (by its pattern's key cells) to every note it was ever shown
+     * removing — a half-done pattern reappears with fewer eliminations,
+     * and must still count once.
+     */
+    private class NoteReplay(
+        val marks: Array<Set<Int>>,
+        val removed: Set<NoteRef>,
+        val seen: Map<Set<Int>, Set<NoteRef>>,
+    )
+
+    /**
+     * Replay the history's note moves from the drill's start. Each
+     * removal must be one the method makes on the board as it stood at
+     * that moment (so any valid path is accepted, and a note a later
+     * application removes can't be taken early); a note may be added
+     * back only if it was there at the start. Null if any move breaks
+     * these rules, or the board doesn't match the replay.
+     */
+    private fun replayNotes(drill: TrainerDrill, state: GameState): NoteReplay? {
+        val grid = drill.grid.toIntArray()
+        val name = drill.method.techniqueName
+        val marks = Array(81) { drill.marks[it] }
+        val seen = mutableMapOf<Set<Int>, MutableSet<NoteRef>>()
+        fun removeAll(notes: List<NoteRef>): Boolean {
+            val now = HintEngine.allEliminations(name, grid, marks)
+            for (h in now) seen.getOrPut(h.keyCells) { mutableSetOf() } += eliminationsOf(h)
+            val allowed = now.flatMap(::eliminationsOf).toSet()
+            if (!allowed.containsAll(notes)) return false
+            for (n in notes) marks[n.cell] = marks[n.cell] - n.digit
+            return true
+        }
+        fun add(n: NoteRef): Boolean {
+            if (n.digit !in drill.marks[n.cell]) return false
+            marks[n.cell] = marks[n.cell] + n.digit
+            return true
+        }
+        for (move in state.history) {
+            val ok = when (move) {
+                is Move.TogglePencilMark -> {
+                    val n = NoteRef(move.row * 9 + move.col, move.digit)
+                    if (move.added) add(n) else removeAll(listOf(n))
+                }
+                is Move.PencilSweep ->
+                    move.addedMarks.all { add(NoteRef(it.row * 9 + it.col, it.digit)) } &&
+                        removeAll(move.removedMarks.map { NoteRef(it.row * 9 + it.col, it.digit) })
+                // Values are judged separately; note drills place none.
+                is Move.SetValue, is Move.ClearValue -> true
+            }
+            if (!ok) return null
+        }
         for (i in 0 until 81) {
-            if (state.cells[i].value != null) continue
-            val now = state.cells[i].pencilMarks.keys
-            val start = drill.marks[i]
-            if (!start.containsAll(now)) return null
-            for (d in start) if (d !in now) removed += NoteRef(i, d)
+            if (state.cells[i].value == null && state.cells[i].pencilMarks.keys != marks[i]) return null
         }
-        return removed
-    }
-
-    /** Whether, with [note] put back, the method on the current board removes it. */
-    private fun justifiedNow(drill: TrainerDrill, state: GameState, note: NoteRef): Boolean {
-        val grid = IntArray(81) { state.cells[it].value ?: 0 }
-        val marks = Array(81) { state.cells[it].pencilMarks.keys.toSet() }
-        marks[note.cell] = marks[note.cell] + note.digit
-        return HintEngine.allEliminations(drill.method.techniqueName, grid, marks).any { note in eliminationsOf(it) }
+        val removed = (0 until 81).flatMap { i -> (drill.marks[i] - marks[i]).map { NoteRef(i, it) } }.toSet()
+        return NoteReplay(marks, removed, seen)
     }
 
     /**
      * Progress counters for the drill screen. [notes] is null for
      * placement drills; [applications] counts singles placed there, and
-     * fully applied instances of the method in note drills.
+     * fully applied instances of the method in note drills. Note-drill
+     * totals are what's done plus what the method still reaches from the
+     * player's board, so they follow the path the player takes.
      */
     data class Progress(val notes: Pair<Int, Int>?, val applications: Pair<Int, Int>)
 
@@ -77,10 +117,18 @@ object TrainerJudge {
             val total = drill.targets.size
             return Progress(null, (total - remaining(drill, state)) to total)
         }
-        val removed = removedNotes(drill, state).orEmpty()
-        val notesDone = drill.allEliminations.count { it in removed }
-        val appsDone = drill.applications.count { removed.containsAll(it) }
-        return Progress(notesDone to drill.allEliminations.size, appsDone to drill.applications.size)
+        val replay = replayNotes(drill, state) ?: return Progress(0 to drill.allEliminations.size, 0 to drill.applications.size)
+        val ahead = TrainerGenerator.eliminationClosure(drill.method, drill.grid.toIntArray(), replay.marks.toList())
+        val notesDone = replay.removed.size
+        // Two patterns can justify the same removals; one removal is one
+        // application, so count a completed set once, and not at all when
+        // it sits inside a larger completed one.
+        val completed = replay.seen.values.filter { replay.removed.containsAll(it) }.toSet()
+        val appsDone = completed.count { set -> completed.none { other -> other != set && other.containsAll(set) } }
+        return Progress(
+            notesDone to notesDone + ahead.flatten().toSet().size,
+            appsDone to appsDone + ahead.size,
+        )
     }
 
     /** Targets still to place in a placement drill (0 for note drills). */
@@ -140,7 +188,7 @@ object TrainerJudge {
         // Later applications open up as notes go, so look at the board now.
         val grid = IntArray(81) { state.cells[it].value ?: 0 }
         val marks = Array(81) { state.cells[it].pencilMarks.keys.toSet() }
-        val now = HintEngine.allEliminations(drill.method.techniqueName, grid, marks)
-        return now.firstOrNull { h -> eliminationsOf(h).all { it in drill.allEliminations } } ?: now.firstOrNull()
+        // Any path the method allows is fine, so just take its next step.
+        return HintEngine.allEliminations(drill.method.techniqueName, grid, marks).firstOrNull()
     }
 }

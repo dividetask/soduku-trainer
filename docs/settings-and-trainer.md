@@ -81,15 +81,18 @@ X-Wing, and a naked or hidden triple containing a pair is that pair.
   takes. A single may only be placed once it is actually available —
   a correct value that the method can't reach yet, or that comes from a
   different method, flashes red and is undone.
-- **Note methods:** the totals are worked out up front the same way:
-  apply the method (the first instance it finds, as a hint would) to the
-  notes over and over until it removes nothing more. The top bar shows
-  both counts, e.g. "3/7 candidates" and "1/2 Pointing Pairs"; an
-  application counts once all its notes are gone. The drill completes
-  when every one of those notes is removed, in any order — two X-Wings
-  both have to be done. Removing any other note, a note only a later
-  application removes before the method can reach it, adding a note, or
-  placing a value flashes red and is undone.
+- **Note methods:** any removal the method makes on the board *as it
+  stands at that moment* is accepted, so any valid path works — when
+  several applications exist, doing one can rule others out, and the
+  player may pick whichever they like. A note the method can't reach yet,
+  any other note, adding a note, or placing a value flashes red and is
+  undone. The top bar shows both counts, e.g. "3/7 candidates" and
+  "1/2 Pointing Pairs": what's done plus what the method still reaches
+  from the player's board (applying it over and over, as a hint would).
+  The totals stay put while the player follows the hints and change only
+  when they take a different path. An application counts once all its
+  notes are gone; two patterns that remove the same notes count once.
+  The drill completes when the method finds nothing more.
 
 Every drill shows its counter, even when the total is one ("0/1 Naked
 Singles").

@@ -363,12 +363,84 @@ class TrainerTest {
         assertEquals(drill.instances[1], TrainerJudge.hintFor(drill, s))
     }
 
+    // ---- Different valid paths (a player's Empty Rectangle board) ----
+
+    /**
+     * A board with four Empty Rectangles on digit 3, each removing one
+     * note; each removal breaks some of the others, and every order
+     * removes exactly two.
+     */
+    private fun fourEmptyRectanglesDrill(): TrainerDrill {
+        val rows = listOf(
+            "1 5 2 9 4 3 7 6 8", "8 3 9 26 26 7 5 1 4", "47 47 6 8 5 1 3 2 9",
+            "6 8 3 157 17 4 9 57 2", "9 1 7 235 23 6 8 4 35", "45 2 45 37 8 9 1 37 6",
+            "2 9 145 134 13 8 6 35 7", "57 6 15 137 9 2 4 8 35", "3 47 8 467 67 5 2 9 1",
+        )
+        val grid = IntArray(81)
+        val marks = Array(81) { emptySet<Int>() }
+        rows.forEachIndexed { r, line ->
+            line.split(" ").forEachIndexed { c, t ->
+                if (t.length == 1) grid[r * 9 + c] = t.toInt() else marks[r * 9 + c] = t.map { it - '0' }.toSet()
+            }
+        }
+        val solution = SudokuSolver.solveOne(grid)!!.toList()
+        return TrainerDrill(
+            method = TrainerMethod.EmptyRectangle,
+            puzzle = Puzzle("four-ers", Difficulty.Master, grid.toList(), solution),
+            grid = grid.toList(),
+            marks = marks.toList(),
+            placements = emptySet(),
+            instances = HintEngine.allEliminations("Empty Rectangle", grid, marks),
+            applications = TrainerGenerator.eliminationClosure(TrainerMethod.EmptyRectangle, grid, marks.toList()),
+        )
+    }
+
+    @Test
+    fun `any application the method allows is accepted, not just the hint's path`() {
+        val drill = fourEmptyRectanglesDrill()
+        assertEquals(4, drill.instances.size)
+        // Row 5, column 9 — not the first rectangle a hint would show.
+        val r5c9 = NoteRef(4 * 9 + 8, 3)
+        assertTrue(drill.instanceEliminations.first() != setOf(r5c9))
+        val s = removeNotes(drill.toGameState(), listOf(r5c9))
+        assertEquals(TrainerJudge.Verdict.InProgress, TrainerJudge.judge(drill, s))
+        assertEquals(TrainerJudge.Progress(1 to 2, 1 to 2), TrainerJudge.progress(drill, s))
+    }
+
+    @Test
+    fun `every path through the rectangles ends the drill`() {
+        val drill = fourEmptyRectanglesDrill()
+        for (first in drill.instanceEliminations) {
+            var s = removeNotes(drill.toGameState(), first)
+            assertTrue(TrainerJudge.judge(drill, s) != TrainerJudge.Verdict.Wrong, "first step $first judged wrong")
+            // Follow the hints the rest of the way.
+            repeat(5) {
+                val h = TrainerJudge.hintFor(drill, s) as? Hint.EliminationHint ?: return@repeat
+                s = removeNotes(s, eliminationsOf(h))
+            }
+            assertEquals(TrainerJudge.Verdict.Complete, TrainerJudge.judge(drill, s), "path from $first")
+            assertEquals(TrainerJudge.Progress(2 to 2, 2 to 2), TrainerJudge.progress(drill, s))
+        }
+    }
+
+    @Test
+    fun `a note the method can't reach on the current board is still wrong`() {
+        val drill = fourEmptyRectanglesDrill()
+        // Row 5, column 4 has a 3 no rectangle removes.
+        val s = removeNotes(drill.toGameState(), listOf(NoteRef(4 * 9 + 3, 3)))
+        assertEquals(TrainerJudge.Verdict.Wrong, TrainerJudge.judge(drill, s))
+    }
+
     // ---- Helpers ----
 
-    private fun removeNotes(state: GameState, notes: Set<NoteRef>): GameState {
-        val cells = state.cells.toMutableList()
-        for (n in notes) cells[n.cell] = cells[n.cell].let { it.copy(pencilMarks = it.pencilMarks - n.digit) }
-        return state.copy(cells = cells)
+    /** Remove [notes] the way a player does: pencil on, tap each, in order. */
+    private fun removeNotes(state: GameState, notes: Collection<NoteRef>): GameState {
+        var s = state.copy(pencilOn = true)
+        for (n in notes) {
+            if (n.digit !in s.cells[n.cell].pencilMarks) continue
+            s = BoardMoves.tapCell(s.copy(activeDigit = n.digit), n.cell / 9, n.cell % 9)
+        }
+        return s
     }
 
     private fun place(state: GameState, p: NoteRef): GameState {
