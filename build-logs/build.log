@@ -7,19 +7,19 @@ Please add the Kotlin plugin to the common parent project or the root project, t
 If the parent project does not need the plugin, add 'apply false' to the plugin line.
 See: https://docs.gradle.org/current/userguide/plugins.html#sec:subprojects_plugins_dsl
 The Kotlin plugin was loaded in the following projects: ':app', ':domain'
-> Task :app:preBuild UP-TO-DATE
 > Task :domain:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preBuild UP-TO-DATE
 > Task :app:preDebugBuild UP-TO-DATE
 > Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
 > Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :app:generateDebugBuildConfig
 > Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :domain:processResources NO-SOURCE
 > Task :app:generateDebugResValues UP-TO-DATE
 > Task :app:mapDebugSourceSetPaths UP-TO-DATE
 > Task :app:generateDebugResources UP-TO-DATE
 > Task :app:mergeDebugResources UP-TO-DATE
 > Task :app:packageDebugResources UP-TO-DATE
-> Task :domain:processResources NO-SOURCE
 > Task :app:parseDebugLocalResources UP-TO-DATE
 > Task :app:createDebugCompatibleScreenManifests
 > Task :app:extractDeepLinksDebug UP-TO-DATE
@@ -59,5 +59,5 @@ The Kotlin plugin was loaded in the following projects: ':app', ':domain'
 > Task :app:assembleDebug
 w: Detected multiple Kotlin daemon sessions at 
 
-BUILD SUCCESSFUL in 19s
+BUILD SUCCESSFUL in 21s
 39 actionable tasks: 16 executed, 23 up-to-date
